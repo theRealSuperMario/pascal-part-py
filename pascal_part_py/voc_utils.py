@@ -7,15 +7,7 @@ import matplotlib.pyplot as plt
 import skimage
 from skimage import io
 import xmltodict
-
-
-# For backwards support
-# https://stackoverflow.com/questions/36932/how-can-i-represent-an-enum-in-python
-def enum(*sequential, **named):
-    enums = dict(zip(sequential, range(len(sequential))), **named)
-    reverse = dict((value, key) for key, value in enums.items())
-    enums["reverse_mapping"] = reverse
-    return type("Enum", (), enums)
+import enum
 
 
 def crop_box(image, xmin, xmax, ymin, ymax):
@@ -35,69 +27,78 @@ def crop_box(image, xmin, xmax, ymin, ymax):
 # -- some images contain multiple objects. If you want to train on individual croopped images, you need to add the images multiple times int he training set insted of once.
 # image sets files only indicate if an image contains an object class or not, not how many
 # therefore, we still need to build the custom csv files
-
-OBJECT_CLASS = enum(
-    aeroplane=0,
-    bicycle=1,
-    bird=2,
-    boat=3,
-    bottle=4,
-    bus=5,
-    car=6,
-    cat=7,
-    chair=8,
-    cow=9,
-    diningtable=10,
-    dog=11,
-    horse=12,
-    motorbike=13,
-    person=14,
-    pottedplant=15,
-    sheep=16,
-    sofa=17,
-    train=18,
-    tvmonitor=19,
-)
-
-OBJECT_CLASS_NAMES = [
-    "aeroplane",
-    "bicycle",
-    "bird",
-    "boat",
-    "bottle",
-    "bus",
-    "car",
-    "cat",
-    "chair",
-    "cow",
-    "diningtable",
-    "dog",
-    "horse",
-    "motorbike",
-    "person",
-    "pottedplant",
-    "sheep",
-    "sofa",
-    "train",
-    "tvmonitor",
-]
+# TODO: remove enum. It is too complicated
 
 
-IMAGE_SET_VOC_2012 = enum("Action", "Main", "Layout", "Segmentation")
+class OBJECT_CLASS(enum.Enum):
+    aeroplane = 0
+    bicycle = 1
+    bird = 2
+    boat = 3
+    bottle = 4
+    bus = 5
+    car = 6
+    cat = 7
+    chair = 8
+    cow = 9
+    diningtable = 10
+    dog = 11
+    horse = 12
+    motorbike = 13
+    person = 14
+    pottedplant = 15
+    sheep = 16
+    sofa = 17
+    train = 18
+    tvmonitor = 19
+
+
+OBJECT_CLASS_NAMES = [o.name for o in OBJECT_CLASS]
+
 from itertools import product
 
 
-# list of "aeroplain_train", "aeroplain_val", ...
-MAIN_IMAGE_SETS = list(product(OBJECT_CLASS_NAMES, ["train", "trainval", "val"]))
-MAIN_IMAGE_SETS = list(map(lambda x: "_".join(x), MAIN_IMAGE_SETS))
-MAIN_IMAGE_SETS += ["train", "trainval", "val"]
-MAIN_IMAGE_SETS = enum(*MAIN_IMAGE_SETS)
+class DATA_SPLITS(enum.Enum):
+    train = 0
+    trainval = 1
+    val = 2
+
+
+DATA_SPLIT_NAMES = [o.name for o in DATA_SPLITS]
+
+
+class PascalVOCDataset:
+    def __init__(self, dir_VOC_root, object_class, data_split):
+        self.voc = VOCUtils(dir_VOC_root)
+        self.image_set = self.voc.get_image_set(object_class, data_split)
+        self.files = self.voc.load_image_set_as_list(self.image_set)
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, i):
+        fname = self.files[i]
+        annotation_file = self.voc.get_annotationpath_from_fname(fname)
+        annotation = self.voc.load_annotation(annotation_file)
+        return annotation
+
+
+class CroppedPascalVOC(PascalVOCDataset):
+    def __init__(self, dir_VOC_root, dir_cropped_csv, object_class, data_split):
+        self.voc = VOCUtils(dir_VOC_root)
+        self.dir_cropped_csv = dir_cropped_csv
+        self.files = self.voc.load_object_class_cropped_as_list(
+            object_class, data_split, dir_cropped_csv
+        )
+        # files is a list of {"fname" : xxx.jpg, "bbox" : {"xmin" : xmin, "ymin" : ymin}}
+
+    def __getitem__(self, i):
+        return self.files[i]
 
 
 class VOCUtils:
-    def __init__(self, dir_VOC_root, dir_pascal_csv):
+    def __init__(self, dir_VOC_root):
         self.dir_VOC_root = dir_VOC_root
-        self.dir_pascal_csv = dir_pascal_csv
         self.dir_JPEGImages = os.path.join(dir_VOC_root, "JPEGImages")
         self.dir_Annotations = os.path.join(dir_VOC_root, "Annotations")
         self.dir_ImageSets = os.path.join(dir_VOC_root, "ImageSets")
@@ -106,80 +107,57 @@ class VOCUtils:
         self.dir_ImageSetLayout = os.path.join(self.dir_ImageSets, "Layout")
         self.dir_ImageSetSegmentation = os.path.join(self.dir_ImageSets, "Segmentation")
 
-    @staticmethod
-    def OBJECT_CLASSES():
-        """
-        List all the image sets from Pascal VOC. Don't bother computing
-        this on the fly, just remember it. It's faster.
-        """
-        return [
-            "aeroplane",
-            "bicycle",
-            "bird",
-            "boat",
-            "bottle",
-            "bus",
-            "car",
-            "cat",
-            "chair",
-            "cow",
-            "diningtable",
-            "dog",
-            "horse",
-            "motorbike",
-            "person",
-            "pottedplant",
-            "sheep",
-            "sofa",
-            "train",
-            "tvmonitor",
-        ]
-
-    @staticmethod
-    def SUBSETS():
-        return ["train", "val"]
+        files = os.listdir(self.dir_Annotations)
+        files = sorted(list(map(lambda x: os.path.splitext(x)[0], files)))
+        self._files = files
 
     @property
     def annotation_files(self):
         """ returns absolute paths of annotation xml files """
-        files = os.listdir(self.dir_Annotations)
+        files = self.filenames
         files = sorted(
-            list(map(lambda x: os.path.join(self.dir_Annotations, x), files))
+            list(map(lambda x: os.path.join(self.dir_Annotations, x + ".xml"), files))
         )
         return files
 
     @property
     def JPEG_files(self):
         """ returns absolute paths of annotation xml files """
-        files = os.listdir(self.dir_Annotations)
-        files = sorted(list(map(lambda x: os.path.join(self.dir_JPEGImages, x), files)))
+        files = self.filenames
+        files = sorted(
+            list(map(lambda x: os.path.join(self.dir_JPEGImages, x + ".jpg"), files))
+        )
         return files
 
     @property
     def filenames(self):
         """ returns list of filenames within the dataset (without extension) """
-        files = os.listdir(self.dir_Annotations)
-        files = sorted(list(map(lambda x: os.path.splitext(x)[0], files)))
-        return files
+        return self._files
 
-    def imgs_from_category(self, cat_name, dataset):
-        """
-        Get a list of filenames for images in a particular category as a pandas dataframe.
-
-        Args:
-            cat_name (string): Category name as a string (from list_image_sets())
-            dataset (string): "train", "val", "train_val", or "test" (if available)
-
-        Returns:
-            pandas dataframe: pandas DataFrame of all filenames from that category
-        """
-        filename = os.path.join(self.dir_ImageSets, cat_name + "_" + dataset + ".txt")
-        df = pd.read_csv(
-            filename, delim_whitespace=True, header=None, names=["filename", "true"]
-        )
+    def load_image_set(
+        self, image_set,
+    ):
+        # TODO: maybe pandas is smart enough so that I don't need the if case here. But I am not sure.
+        if image_set in [d.name for d in DATA_SPLITS]:
+            "train, val and trainval do not have column which indicates if object class is in image"
+            df = pd.read_csv(
+                os.path.join(self.dir_ImageSetMain, image_set + ".txt"),
+                names=["fname"],
+                delim_whitespace=True,
+                header=None,
+            )
+        else:
+            df = pd.read_csv(
+                os.path.join(self.dir_ImageSetMain, image_set + ".txt"),
+                names=["fname", "is_in_image"],
+                delim_whitespace=True,
+                header=None,
+            )
+            # only keep fnames where object is in image
+            df = df[df.is_in_image == 1]
         return df
 
-    def imgs_from_category_as_list(self, cat_name, dataset):
+    def load_image_set_as_list(self, image_set):
         """
         Get a list of filenames for images in a particular category
         as a list rather than a pandas dataframe.
@@ -191,11 +169,10 @@ class VOCUtils:
         Returns:
             list of srings: all filenames from that category
         """
-        df = self.imgs_from_category(cat_name, dataset)
-        df = df[df["true"] == 1]
-        return df["filename"].values
+        df = self.load_image_set(image_set)
+        return df.fname.values
 
-    def annotation_file_from_img(self, img_name):
+    def get_annotationpath_from_fname(self, img_name):
         """
         Given an image name `img_name` (without .jpg extensions), get the annotation file for that image.(dir_Annotations/img_name + .xml).
 
@@ -245,47 +222,16 @@ class VOCUtils:
 
         NOTE: loading all annotations into a dataframe takes a lot of time.
         """
+        print(
+            "loading all annotations into a dataframe takes some time. Consider dumping the dataframe somewhere if you need it more often."
+        )
         all_annotations = self._load_all_annotations()
         df = pd.concat(
             [pd.DataFrame.from_dict(a, orient="index") for a in all_annotations], axis=0
         )
         return df
 
-    def load_img(self, img_filename):
-        """
-        Load image from the filename. Default is to load in color if
-        possible.
-
-        Args:
-            img_name (string): string of the image name, relative to
-                the image directory.
-
-        Returns:
-            np array of float32: an image as a numpy array of float32
-        """
-        img_filename = os.path.join(self.dir_JPEGImages, img_filename + ".jpg")
-        img = skimage.img_as_float(io.imread(img_filename)).astype(np.float32)
-        if img.ndim == 2:
-            img = img[:, :, np.newaxis]
-        elif img.shape[2] == 4:
-            img = img[:, :, :3]
-        return img
-
-    def load_imgs(self, img_filenames):
-        """
-        Load a bunch of images from disk as np array.
-
-        Args:
-            img_filenames (list of strings): string of the image name, relative to
-                the image directory.
-
-        Returns:
-            np array of float32: a numpy array of images. each image is
-                a numpy array of float32
-        """
-        return np.array([self.load_img(fname) for fname in img_filenames])
-
-    def _load_data(self, object_class, split=None):
+    def load_object_class_cropped(self, object_class, data_split, dir_cropped_csv):
         """
         Loads all the data as a pandas DataFrame for a particular category.
 
@@ -299,37 +245,67 @@ class VOCUtils:
         Returns:
             pandas DataFrame: df of filenames and bounding boxes
         """
-        if split is None:
-            raise ValueError("Must provide data_type = `train` or `val`")
-        filename = os.path.join(
-            self.dir_pascal_csv, split + "_" + object_class + ".csv"
-        )
+
+        image_set = self.get_image_set(object_class, data_split)
+
+        filename = os.path.join(dir_cropped_csv, image_set + ".csv")
         if os.path.isfile(filename):
             return pd.read_csv(filename)
         else:
             # Make data and then return them
-            df = self._make_data(object_class, split, filename)
+            df = self._make_object_class_cropped_data(
+                object_class, data_split, dir_cropped_csv
+            )
             return df
 
-    def _make_data(self, category, data_type, filename):
-        train_img_list = self.imgs_from_category_as_list(category, data_type)
+    def load_object_class_cropped_as_list(
+        self, object_class, data_split, dir_cropped_csv
+    ):
+        df = self.load_object_class_cropped(object_class, data_split, dir_cropped_csv)
+        return df.to_dict("records")
+
+    def get_image_set(self, object_class, data_split):
+        if object_class is not None:
+            image_set = "{}_{}".format(object_class.name, data_split.name)
+        else:
+            # allows to use train, val and trainval without specifying object class, to entire set is used.
+            image_set = data_split.name
+        return image_set
+
+    def _make_object_class_cropped_data(
+        self, object_class, data_split, dir_cropped_csv
+    ):
+        image_set = self.get_image_set(object_class, data_split)
+
+        filename_csv = os.path.join(dir_cropped_csv, image_set + ".csv")
+        file_list = self.load_image_set_as_list(image_set)
         data = []
-        for item in train_img_list:
-            anno = self.load_annotation(item)
-            objs = anno.findAll("object")
+
+        for fname in file_list:
+            annotation_filename = self.get_annotationpath_from_fname(fname)
+            anno = self.load_annotation(annotation_filename)
+
+            # Iterate over objects and append each object with filename into dataframe
+            objs = anno["annotation"]["object"]
             for obj in objs:
-                obj_names = obj.findChildren("name")
-                for name_tag in obj_names:
-                    if str(name_tag.contents[0]) == category:
-                        fname = anno.findChild("filename").contents[0]
-                        bbox = obj.findChildren("bndbox")[0]
-                        xmin = int(bbox.findChildren("xmin")[0].contents[0])
-                        ymin = int(bbox.findChildren("ymin")[0].contents[0])
-                        xmax = int(bbox.findChildren("xmax")[0].contents[0])
-                        ymax = int(bbox.findChildren("ymax")[0].contents[0])
+                if object_class is None:
+                    # just take all objects
+                    bbox = obj["bndbox"]
+                    xmin = bbox["xmin"]
+                    ymin = bbox["ymin"]
+                    xmax = bbox["xmax"]
+                    ymax = bbox["ymax"]
+                    data.append([fname, xmin, ymin, xmax, ymax])
+                else:
+                    if obj["name"] == object_class.name:
+                        bbox = obj["bndbox"]
+                        xmin = bbox["xmin"]
+                        ymin = bbox["ymin"]
+                        xmax = bbox["xmax"]
+                        ymax = bbox["ymax"]
                         data.append([fname, xmin, ymin, xmax, ymax])
         df = pd.DataFrame(data, columns=["fname", "xmin", "ymin", "xmax", "ymax"])
-        df.to_csv(filename)
+        df.to_csv(filename_csv)
         return df
 
     def get_image_url_list(self, category, data_type=None):
@@ -343,7 +319,7 @@ class VOCUtils:
         Returns:
             list of strings: list of all filenames for that particular category
         """
-        df = self._load_data(category, split=data_type)
+        df = self.load_object_class_cropped(category, split=data_type)
         image_url_list = list(unique_everseen(list(self.dir_JPEGImages + df["fname"])))
         return image_url_list
 
@@ -371,7 +347,7 @@ class VOCUtils:
         # mask_type should be bbox1 or bbox
         if mask_type is None:
             raise ValueError("Must provide mask_type")
-        df = self._load_data(cat_name, split=data_type)
+        df = self.load_object_class_cropped(cat_name, split=data_type)
         # load each image, turn into a binary mask
         masks = []
         prev_url = ""
@@ -452,7 +428,7 @@ class VOCUtils:
         ax2.set_title("Mask")
         plt.show(block=False)
 
-    def cat_name_to_cat_id(self, cat_name):
+    def cat_name_to_cat_id(self, object_class):
         """
         Transform a category name to an id number alphabetically.
 
@@ -462,9 +438,7 @@ class VOCUtils:
         Returns:
             int: the integer that corresponds to the category name
         """
-        cat_list = self.OBJECT_CLASSES()
-        cat_id_dict = dict(zip(cat_list, range(len(cat_list))))
-        return cat_id_dict[cat_name]
+        return OBJECT_CLASS_NAMES.index[object_class]
 
     def display_img_and_masks(self, img, true_mask, predicted_mask, block=False):
         """
@@ -515,7 +489,7 @@ class VOCUtils:
         if data_type is None:
             raise ValueError("Must provide data_type = train or val")
         filename = os.path.join(self.dir_ImageSets, data_type + ".txt")
-        cat_list = self.OBJECT_CLASSES()
+        cat_list = OBJECT_CLASS_NAMES
         df = pd.read_csv(
             filename, delim_whitespace=True, header=None, names=["filename"]
         )

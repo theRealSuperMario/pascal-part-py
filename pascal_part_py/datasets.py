@@ -3,8 +3,9 @@ import numpy as np
 from pascal_part_py.VOClabelcolormap import color_map
 from pascal_part_py.anno import ImageAnnotation
 import glob
-from pascal_part_py.voc_utils import crop_box
+from pascal_part_py.voc_utils import crop_box, OBJECT_CLASS_NAMES
 
+from pascal_part_py import voc_utils
 
 import pandas as pd
 import os
@@ -15,10 +16,10 @@ import matplotlib.pyplot as plt
 import skimage
 from skimage import io
 
-from pascal_part_py.voc_utils import PascalVOCDataset
+from pascal_part_py.voc_utils import VOCUtils
 
 
-class PascalPartDataset(PascalVOCDataset):
+class PascalPartDataset:
     def __init__(
         self,
         VOC_root_dir,
@@ -36,11 +37,11 @@ class PascalPartDataset(PascalVOCDataset):
         dir_Annotations_Part : str
             directory `Annotations_Part` from pascal parts dataset, contains .mat files
         """
-        super(PascalPartDataset, self).__init__(VOC_root_dir, dir_pascal_csv)
+        self.voc = VOCUtils(VOC_root_dir, dir_pascal_csv)
         self.dir_Annotations_Part = dir_Annotations_Part
 
         # returns dataframe
-        self.labels = self._load_data(category, data_type)
+        self.labels = self.voc.load_object_class_cropped(category, data_type)
         # converts dataframe to list of dicts
         self.labels = self.labels.to_dict("records")
 
@@ -54,7 +55,7 @@ class PascalPartDataset(PascalVOCDataset):
         fname_im = fname + ".jpg"
         fname_anno = fname + ".mat"
         an = ImageAnnotation(
-            os.path.join(self.dir_JPEGImages, fname_im),
+            os.path.join(self.voc.dir_JPEGImages, fname_im),
             os.path.join(self.dir_Annotations_Part, fname_anno),
         )
         xmax = example["xmax"]
@@ -95,8 +96,8 @@ class CroppedPascalPartDataset(PascalPartDataset):
 
 if __name__ == "__main__":
 
-    for image_set in PascalVOCDataset.list_image_sets():
-        for split in PascalVOCDataset.SPLITS():
+    for image_set in voc_utils.OBJECT_CLASSES_NAMES:
+        for split in voc_utils.DATA_SPLITS:
             dset = PascalPartDataset(
                 "/media/sandro/Volume/datasets/PascalVOC/PascalParts/VOCdevkit/VOC2010",
                 "/media/sandro/Volume/datasets/PascalVOC/python_voc_devkit/csv/",
