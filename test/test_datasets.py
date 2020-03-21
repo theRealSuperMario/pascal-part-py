@@ -10,33 +10,16 @@ DIR_PASCAL_CSV = os.environ["DIR_PASCAL_CSV"]
 DIR_ANNOTATIONS_PART = os.environ["DIR_ANNOTATIONS_PART"]
 
 
-# class Test_PascalPartDataset:
-#     def test_bicycle(self):
-#         split = "train"
-#         image_set = "bicycle"
-#         dset = PascalPartDataset(
-#             DIR_VOC_ROOT,
-#             DIR_PASCAL_CSV,
-#             DIR_ANNOTATIONS_PART,
-#             data_type=split,
-#             category=image_set,
-#         )
-#         ex = dset[0]
-#         assert list(ex.keys()) == ["annotations_part", "fname", "bbox"]
-
-
 class Test_VOCutils:
     def test_load_annotation(self, tmpdir):
         voc = voc_utils.VOCUtils(DIR_VOC_ROOT)
         anno = voc.load_annotation(voc.annotation_files[0])
         df = pd.DataFrame.from_dict(anno, orient="index")
 
-        # item 0 only has a single annotations, which is why it gets returned as single OrderedDict
         assert len(df.iloc[0].object) == 1
 
         anno = voc.load_annotation(voc.annotation_files[2])
         df = pd.DataFrame.from_dict(anno, orient="index")
-        # item 2 has multiple annotations, which is why it gets returned as a list of OrderedDicts
         assert len(df.iloc[0].object) == 3
 
     def test_load_object_class_cropped(self, tmpdir):
@@ -66,13 +49,14 @@ class Test_CroppedPascalVoc:
         assert len(dset) == 403
 
 
-# class Test_PascalVOCDataset:
-#     def test_voc_dataset(self, tmpdir):
-#         csv_dir = tmpdir.mkdir("csv")
-#         dset = PascalVOCDataset(DIR_VOC_ROOT, DIR_PASCAL_CSV)
-#         assert len(os.listdir(csv_dir)) == 1
+class Test_PascalVOCDataset:
+    def test_dataset(self):
+        dset = voc_utils.PascalVOCDataset(
+            DIR_VOC_ROOT, voc_utils.OBJECT_CLASS.aeroplane, voc_utils.DATA_SPLITS.train
+        )
+        assert len(dset) == 283
 
-#         ex = dset[0]
-
-#         assert list(ex.keys()) == ["annotations_part", "fname", "bbox"]
-
+        dset = voc_utils.PascalVOCDataset(
+            DIR_VOC_ROOT, None, voc_utils.DATA_SPLITS.train
+        )
+        assert len(dset) == 4998
