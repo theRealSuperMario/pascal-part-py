@@ -39,7 +39,7 @@ class ANNOTATION_CLASS(enum.Enum):
     cat = 8
     chair = 9
     cow = 10
-    diningtable = 11
+    table = 11
     dog = 12
     horse = 13
     motorbike = 14
