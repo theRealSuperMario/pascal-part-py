@@ -45,16 +45,16 @@ class ImageAnnotation(object):
         self.inst_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
         self.part_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
         for i, obj in enumerate(self.objects):
-            class_ind = obj.class_ind
+            object_class_index = obj.object_class.value
             mask = obj.mask
 
             self.inst_mask[mask > 0] = i + 1
-            self.cls_mask[mask > 0] = class_ind
+            self.cls_mask[mask > 0] = object_class_index
 
             if obj.n_parts > 0:
                 for p in obj.parts:
                     part_name = p.part_name
-                    pid = PIMAP[class_ind][part_name]
+                    pid = PIMAP[object_class_index][part_name]
                     self.part_mask[p.mask > 0] = pid
 
 
@@ -94,8 +94,12 @@ class PascalObject(PascalBase):
     def __init__(self, obj):
         super(PascalObject, self).__init__(obj)
 
-        self.class_name = obj["class"][0]
-        self.class_ind = obj["class_ind"][0, 0]
+        self.object_class = voc_utils.ANNOTATION_CLASS[
+            str(obj["class"][0])
+        ]  # type : pascal_part_annotation.ImageAnnotation
+        # TODO: why is obj["class"] a numpy array?
+
+        # self.object_class_index = self.object_class.value
 
         self.n_parts = obj["parts"].shape[1]
         self.parts = []
