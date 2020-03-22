@@ -1,0 +1,7 @@
+opencv-python
+pandas
+pytest
+numpy
+matplotlib
+skimage
+xmltodict==0.12.0
