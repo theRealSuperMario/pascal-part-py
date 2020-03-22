@@ -25,22 +25,29 @@ def filter_objects(func, image_annotation):
 
 
 class ImageAnnotation(object):
-    def __init__(self, impath, annopath):
+    @classmethod
+    def from_file(cls, impath, annopath):
+        im = imread(impath)
+        data = loadmat(annopath)["anno"][0, 0]
+        objects = []
+        for obj in data["objects"][0, :]:
+            objects.append(PascalObject(obj))
+        imname = data["imname"][0]
+
+        return cls(impath, annopath, im, imname, objects)
+
+    def __init__(self, impath, annopath, im, imname, objects):
         # read image
-        self.im = imread(impath)
         self.impath = impath
+        self.annopath = annopath
+        self.im = im
         self.imsize = self.im.shape
 
-        # read annotations
-        data = loadmat(annopath)["anno"][0, 0]
-        self.imname = data["imname"][0]
-        self.annopath = annopath
+        self.imname = imname
 
         # parse objects and parts
-        self.n_objects = data["objects"].shape[1]
-        self.objects = []
-        for obj in data["objects"][0, :]:
-            self.objects.append(PascalObject(obj))
+        self.objects = objects
+        self.n_objects = len(objects)
 
         # create masks for objects and parts
         self._mat2map()

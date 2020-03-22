@@ -161,7 +161,7 @@ class PascalPartDataset(PascalVOCDataset):
         fname = os.path.splitext(fname)[0]
         fname_im = fname + ".jpg"
         fname_part_anno = fname + ".mat"
-        an = ImageAnnotation(
+        an = ImageAnnotation.from_file(
             os.path.join(self.voc.dir_JPEGImages, fname_im),
             os.path.join(self.dir_Annotations_Part, fname_part_anno),
         )
@@ -194,7 +194,7 @@ class CroppedPascalPartDataset(CroppedPascalVOCDataset):
         fname = example["fname"]
         fname_im = fname + ".jpg"
         fname_part_anno = fname + ".mat"
-        an = ImageAnnotation(
+        an = ImageAnnotation.from_file(
             os.path.join(self.voc.dir_JPEGImages, fname_im),
             os.path.join(self.dir_Annotations_Part, fname_part_anno),
         )
@@ -210,3 +210,4 @@ class CroppedPascalPartDataset(CroppedPascalVOCDataset):
         example["instance_segmentation"] = crop(an.inst_mask)
         example["part_segmentation"] = crop(an.part_mask)
         return example
+
