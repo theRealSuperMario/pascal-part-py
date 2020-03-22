@@ -29,7 +29,7 @@ class Test_VOCutils:
         csv_dir = tmpdir.mkdir("csv")
         voc = voc_utils.VOCLoader(DIR_VOC_ROOT)
         df = voc.load_object_class_cropped(
-            voc_utils.OBJECT_CLASS.aeroplane, voc_utils.DATA_SPLIT.train, csv_dir
+            voc_utils.ANNOTATION_CLASS.aeroplane, voc_utils.DATA_SPLIT.train, csv_dir
         )
         assert len(df) == 403  # pascal VOC 2010
         assert len(os.listdir(csv_dir)) == 1
@@ -42,10 +42,10 @@ class Test_VOCutils:
 class Test_CroppedPascalVoc:
     def test_croppedPascalVOC(self, tmpdir):
         csv_dir = tmpdir.mkdir("csv")
-        dset = voc_utils.CroppedPascalVOC(
+        dset = datasets.CroppedPascalVOCDataset(
             DIR_VOC_ROOT,
             csv_dir,
-            voc_utils.OBJECT_CLASS.aeroplane,
+            voc_utils.ANNOTATION_CLASS.aeroplane,
             voc_utils.DATA_SPLIT.train,
         )
         ex = dset[0]
@@ -54,14 +54,14 @@ class Test_CroppedPascalVoc:
 
 class Test_PascalVOCDataset:
     def test_dataset(self):
-        dset = voc_utils.PascalVOCDataset(
-            DIR_VOC_ROOT, voc_utils.OBJECT_CLASS.aeroplane, voc_utils.DATA_SPLIT.train
+        dset = datasets.PascalVOCDataset(
+            DIR_VOC_ROOT,
+            voc_utils.ANNOTATION_CLASS.aeroplane,
+            voc_utils.DATA_SPLIT.train,
         )
         assert len(dset) == 283  # pascal VOC 2010
 
-        dset = voc_utils.PascalVOCDataset(
-            DIR_VOC_ROOT, None, voc_utils.DATA_SPLIT.train
-        )
+        dset = datasets.PascalVOCDataset(DIR_VOC_ROOT, None, voc_utils.DATA_SPLIT.train)
         assert len(dset) == 4998  # pascal VOC 2010
 
 
@@ -70,10 +70,11 @@ class Test_PascalPartDataset:
         dset = datasets.PascalPartDataset(
             DIR_VOC_ROOT,
             DIR_ANNOTATIONS_PART,
-            voc_utils.OBJECT_CLASS.aeroplane,
+            voc_utils.ANNOTATION_CLASS.aeroplane,
             voc_utils.DATA_SPLIT.train,
         )
         ex = dset[0]
+        assert len(dset) == 283  # pascal VOC 2010
 
 
 class Test_CroppedPascalPartDataset:
@@ -83,7 +84,7 @@ class Test_CroppedPascalPartDataset:
             DIR_VOC_ROOT,
             csv_dir,
             DIR_ANNOTATIONS_PART,
-            voc_utils.OBJECT_CLASS.aeroplane,
+            voc_utils.ANNOTATION_CLASS.aeroplane,
             voc_utils.DATA_SPLIT.train,
         )
         ex = dset[0]

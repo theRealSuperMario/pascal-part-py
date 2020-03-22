@@ -25,30 +25,38 @@ def crop_box(image, xmin, xmax, ymin, ymax):
     return image[ymin:ymax, xmin:xmax, ...]
 
 
-class OBJECT_CLASS(enum.Enum):
-    aeroplane = 0
-    bicycle = 1
-    bird = 2
-    boat = 3
-    bottle = 4
-    bus = 5
-    car = 6
-    cat = 7
-    chair = 8
-    cow = 9
-    diningtable = 10
-    dog = 11
-    horse = 12
-    motorbike = 13
-    person = 14
-    pottedplant = 15
-    sheep = 16
-    sofa = 17
-    train = 18
-    tvmonitor = 19
+class ANNOTATION_CLASS(enum.Enum):
+    """ background + 20 object classes + void class = 21 classes """
+
+    background = 0
+    aeroplane = 1
+    bicycle = 2
+    bird = 3
+    boat = 4
+    bottle = 5
+    bus = 6
+    car = 7
+    cat = 8
+    chair = 9
+    cow = 10
+    diningtable = 11
+    dog = 12
+    horse = 13
+    motorbike = 14
+    person = 15
+    pottedplant = 16
+    sheep = 17
+    sofa = 18
+    train = 19
+    tvmonitor = 20
+    void = 21
 
 
-OBJECT_CLASS_NAMES = [o.name for o in OBJECT_CLASS]
+ANNOTATION_CLASS_NAMES = [o.name for o in ANNOTATION_CLASS]
+
+
+OBJECT_CLASSES = [ANNOTATION_CLASS(i) for i in range(1, 21)]  # aeroplane ... tvmonitor
+OBJECT_CLASS_NAMES = [o.name for o in OBJECT_CLASSES]
 
 
 class DATA_SPLIT(enum.Enum):
@@ -58,139 +66,6 @@ class DATA_SPLIT(enum.Enum):
 
 
 DATA_SPLIT_NAMES = [o.name for o in DATA_SPLIT]
-
-
-# 1. Docstrings
-# 2. Pascal Parts dataset
-
-
-class PascalVOCDataset:
-    def __init__(self, dir_VOC_root, object_class, data_split):
-        """Dataset class for PASCAL VOC 20xx. 
-        Iterates over single images. Annotations contain bounding boxes for objects in the image. 
-        There can be multiple objects in an image, therefore annotations may contain multiple object annotations.
-        Returns only annotations, not images. Inherit your own subclass for data loading.
-
-        For instance, Pascal VOC2010 train set contains 4998 images, thus the length of this dataset is 4998
-
-        See examples and demo for further usage.
-        
-        Parameters
-        ----------
-        dir_VOC_root : str
-            path to VOC root, i.e. 'xxx/VOCdevkit/VOC20xx'.
-        object_class : OBJECT_CLASS or None
-            object class to use. If `None`, will use entire data split.
-        data_split : DATA_SPLIT
-            data split to use, i.e. "train", "val", "trainval"
-
-
-        Examples
-        --------
-
-            # Load only aeroplane class from train split
-            dset = voc_utils.PascalVOCDataset(
-                DIR_VOC_ROOT, voc_utils.OBJECT_CLASS.aeroplane, voc_utils.DATA_SPLIT.train
-            )
-            assert len(dset) == 283  # pascal VOC 2010
-
-            # load entire train set
-            dset = voc_utils.PascalVOCDataset(
-                DIR_VOC_ROOT, None, voc_utils.DATA_SPLIT.train
-            )
-            assert len(dset) == 4998  # pascal VOC 2010
-
-        """
-        self.voc = VOCLoader(dir_VOC_root)
-        self.image_set = get_image_set(object_class, data_split)
-        self.files = self.voc.load_image_set_as_list(self.image_set)
-
-    def __len__(self):
-        return len(self.files)
-
-    def __getitem__(self, i):
-        fname = self.files[i]
-        annotation_file = self.voc.get_annotationpath_from_fname(fname)
-        annotation = self.voc.load_annotation(annotation_file)
-
-        image_file = self.voc.get_jpegpath_from_fname(fname)
-        image = cv2.imread(image_file)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        example = annotation
-        example["image"] = image
-        return example
-
-
-class CroppedPascalVOCDataset:
-    def __init__(self, dir_VOC_root, dir_cropped_csv, object_class, data_split):
-        """Dataset class for iterating over every single annotated object box in the Pascal dataset.
-        
-        In the Pascal dataset, annotations per image can contain multiple object bounding boxes.
-        If you want to crop every object out of the image and iterate over those crops, use this class.
-
-        For instance, Pascal VOC2010 train set contains 4998 images, but 13339 annotated objects. 
-        Thus the length of this dataset is 13339.
-
-        You can filter by `object_class` and data split.
-
-        
-        To prevent figuring out the object boxes every time this class is instantiated,
-        the data is stored in separate csv files in `dir_cropped_csv` and reloaded.
-        I recommend NOT setting `dir_cropped_csv` to a subdir within the vOC dataset, but 
-        to some other path.
-
-        
-        Parameters
-        ----------
-        dir_VOC_root : str
-            path to VOC root, i.e. 'xxx/VOCdevkit/VOC20xx'.
-        dir_cropped_csv : str
-            path to directory where to store intermediate csv files. Preferrably NOT within VOC subdirectory.
-        object_class : OBJECT_CLASS or None
-            object class to use. If `None`, will use entire data split.
-        data_split : DATA_SPLIT
-            data split to use, i.e. "train", "val", "trainval"
-
-        Examples
-        --------
-
-            csv_dir = tmpdir.mkdir("csv")
-            dset = voc_utils.CroppedPascalVOC(
-                DIR_VOC_ROOT,
-                csv_dir,
-                voc_utils.OBJECT_CLASS.aeroplane,
-                voc_utils.DATA_SPLIT.train,
-            )
-            ex = dset[0]
-            assert len(dset) == 403  # pascal VOC 2010
-        """
-        self.voc = VOCLoader(dir_VOC_root)
-        self.dir_cropped_csv = dir_cropped_csv
-        self.files = self.voc.load_object_class_cropped_as_list(
-            object_class, data_split, dir_cropped_csv
-        )
-        # files is a list of {"fname" : xxx.jpg, "xmin" : xmin, "ymin" : ymin, ...}
-
-    def __len__(self):
-        return len(self.files)
-
-    def __getitem__(self, i):
-        example = self.files[i]
-        fname = example["fname"]
-        image_file = self.voc.get_jpegpath_from_fname(fname)
-        image = cv2.imread(image_file)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        bbox = {
-            "xmin": int(example["xmin"]),
-            "xmax": int(example["xmax"]),
-            "ymin": int(example["ymin"]),
-            "ymax": int(example["ymax"]),
-        }
-        crop = functools.partial(crop_box, **bbox)
-        example["image"] = crop(image)
-        return example
 
 
 class VOCLoader:
@@ -439,6 +314,8 @@ class VOCLoader:
 
 
 def get_image_set(object_class, data_split):
+    if object_class in [ANNOTATION_CLASS.background, ANNOTATION_CLASS.void]:
+        raise ValueError("object class cannot be background or void")
     if object_class is not None:
         image_set = "{}_{}".format(object_class.name, data_split.name)
     else:
@@ -458,7 +335,7 @@ def object_class_name2object_class_id(object_class_name):
     Returns:
         int: the integer that corresponds to the category name
     """
-    return OBJECT_CLASS[object_class_name].value
+    return ANNOTATION_CLASS[object_class_name].value
 
 
 def batch_to_canvas(X, cols=None):
@@ -535,3 +412,59 @@ def tile(X, rows, cols):
                 ] = img
     return tiling
 
+
+"""
+Adapted from: https://gist.github.com/wllhf/a4533e0adebe57e3ed06d4b50c8419ae
+
+Python implementation of the color map function for the PASCAL VOC data set.
+Official Matlab version can be found in the PASCAL VOC devkit
+http://host.robots.ox.ac.uk/pascal/VOC/voc2012/index.html#devkit
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+from skimage.io import imshow
+from matplotlib.colors import LinearSegmentedColormap
+
+
+def color_map(N=256, normalized=True, matplotlib=True):
+    def bitget(byteval, idx):
+        return (byteval & (1 << idx)) != 0
+
+    dtype = "float32" if normalized else "uint8"
+    cmap = np.zeros((N, 3), dtype=dtype)
+    for i in range(N):
+        r = g = b = 0
+        c = i
+        for j in range(8):
+            r = r | (bitget(c, 0) << 7 - j)
+            g = g | (bitget(c, 1) << 7 - j)
+            b = b | (bitget(c, 2) << 7 - j)
+            c = c >> 3
+
+        cmap[i] = np.array([r, g, b])
+
+    cmap = cmap / 255 if normalized else cmap
+    if matplotlib:
+        assert normalized is True
+        return LinearSegmentedColormap.from_list("VOClabel_cmap", cmap)
+    else:
+        return cmap
+
+
+def color_map_viz():
+    labels = ANNOTATION_CLASS_NAMES
+    nclasses = 21
+    row_size = 50
+    col_size = 500
+    cmap = color_map()
+    array = np.empty(
+        (row_size * (nclasses + 1), col_size, cmap.shape[1]), dtype=cmap.dtype
+    )
+    for i in range(nclasses):
+        array[i * row_size : i * row_size + row_size, :] = cmap[i]
+    array[nclasses * row_size : nclasses * row_size + row_size, :] = cmap[-1]
+
+    imshow(array)
+    plt.yticks([row_size * i + row_size / 2 for i in range(nclasses + 1)], labels)
+    plt.xticks([])
+    plt.show()

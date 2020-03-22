@@ -2,8 +2,8 @@ import numpy as np
 from scipy.io import loadmat
 from skimage.io import imread
 from skimage.measure import regionprops
-from pascal_part_py.part2ind import get_pimap
-from pascal_part_py.VOClabelcolormap import color_map
+from pascal_part_py.pascal_part import get_pimap
+from pascal_part_py.voc_utils import color_map
 from matplotlib import pyplot as plt
 
 PIMAP = get_pimap()

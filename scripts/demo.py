@@ -20,17 +20,18 @@ import cv2
 @click.option("-i", default=0)
 @click.option("-object-class", default="horse")
 @click.option("-data-split", default="train")
-def main(i, object_class, data_split):
+@click.option("-out-path", default="demo.png")
+def main(i, object_class, data_split, out_path):
     if object_class == "None":
         object_class = None
     else:
-        object_class = voc_utils.OBJECT_CLASS[object_class]
+        object_class = voc_utils.ANNOTATION_CLASS[object_class]
     data_split = voc_utils.DATA_SPLIT[data_split]
     image_set = voc_utils.get_image_set(object_class, data_split)
 
     fig, axes = plt.subplots(2, 2, figsize=(10, 10))
     axes = axes.ravel()
-    dset = voc_utils.PascalVOCDataset(
+    dset = datasets.PascalVOCDataset(
         DIR_VOC_ROOT, object_class=object_class, data_split=data_split,
     )
     examples = [dset[i] for i in range(i, i + 4)]
@@ -43,7 +44,7 @@ def main(i, object_class, data_split):
     axes[0].imshow(canvas)
     axes[0].set_axis_off()
 
-    dset = voc_utils.CroppedPascalVOCDataset(
+    dset = datasets.CroppedPascalVOCDataset(
         DIR_VOC_ROOT, DIR_PASCAL_CSV, object_class=object_class, data_split=data_split,
     )
     examples = [dset[i] for i in range(i, i + 4)]
@@ -151,7 +152,7 @@ def main(i, object_class, data_split):
     axes[3].set_axis_off()
 
     plt.tight_layout()
-    plt.savefig("demo.png")
+    plt.savefig(out_path)
 
 
 if __name__ == "__main__":

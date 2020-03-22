@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.io import imshow
 from matplotlib.colors import LinearSegmentedColormap
+import voc_utils
 
 
 def color_map(N=256, normalized=True, matplotlib=True):
@@ -37,30 +38,7 @@ def color_map(N=256, normalized=True, matplotlib=True):
 
 
 def color_map_viz():
-    labels = [
-        "background",
-        "aeroplane",
-        "bicycle",
-        "bird",
-        "boat",
-        "bottle",
-        "bus",
-        "car",
-        "cat",
-        "chair",
-        "cow",
-        "diningtable",
-        "dog",
-        "horse",
-        "motorbike",
-        "person",
-        "pottedplant",
-        "sheep",
-        "sofa",
-        "train",
-        "tvmonitor",
-        "void",
-    ]
+    labels = voc_utils.OBJECT_CLASS_NAMES
     nclasses = 21
     row_size = 50
     col_size = 500
