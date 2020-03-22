@@ -3,7 +3,6 @@ import numpy as np
 from pascal_part_py.VOClabelcolormap import color_map
 from pascal_part_py.anno import ImageAnnotation
 import glob
-from pascal_part_py.voc_utils import crop_box, OBJECT_CLASS_NAMES
 
 from pascal_part_py import voc_utils
 
@@ -16,17 +15,12 @@ import matplotlib.pyplot as plt
 import skimage
 from skimage import io
 
-from pascal_part_py.voc_utils import VOCUtils
+from pascal_part_py import voc_utils
 
 
-class PascalPartDataset:
+class PascalPartDataset(voc_utils.PascalVOCDataset):
     def __init__(
-        self,
-        VOC_root_dir,
-        dir_pascal_csv,
-        dir_Annotations_Part,
-        data_type="train",
-        category="bicycle",
+        self, VOC_root_dir, dir_Annotations_Part, object_class, data_split,
     ):
         """Dataset to iterate over Pascal Parts Dataset
         
@@ -37,68 +31,74 @@ class PascalPartDataset:
         dir_Annotations_Part : str
             directory `Annotations_Part` from pascal parts dataset, contains .mat files
         """
-        self.voc = VOCUtils(VOC_root_dir, dir_pascal_csv)
         self.dir_Annotations_Part = dir_Annotations_Part
-
-        # returns dataframe
-        self.labels = self.voc.load_object_class_cropped(category, data_type)
-        # converts dataframe to list of dicts
-        self.labels = self.labels.to_dict("records")
-
-    def __len__(self):
-        return len(self.labels)
+        super(PascalPartDataset, self).__init__(VOC_root_dir, object_class, data_split)
 
     def __getitem__(self, i):
-        example = self.labels[i]
-        fname = example["fname"]
+        example = super(PascalPartDataset, self).__getitem__(i)
+        fname = example["annotation"]["filename"]  # .jpg file
         fname = os.path.splitext(fname)[0]
         fname_im = fname + ".jpg"
-        fname_anno = fname + ".mat"
+        fname_part_anno = fname + ".mat"
         an = ImageAnnotation(
             os.path.join(self.voc.dir_JPEGImages, fname_im),
-            os.path.join(self.dir_Annotations_Part, fname_anno),
+            os.path.join(self.dir_Annotations_Part, fname_part_anno),
         )
-        xmax = example["xmax"]
-        xmin = example["xmin"]
-        ymax = example["ymax"]
-        ymin = example["ymin"]
-        bbox = {
-            "xmax": xmax,
-            "xmin": xmin,
-            "ymax": ymax,
-            "ymin": ymin,
-        }
         return {
             "annotations_part": an,
             "image": an.im,
-            "class_mask": an.inst_mask,
-            "instance_mask": an.inst_mask,
-            "part_mask": an.part_mask,
-            "fname": fname,
-            "bbox": bbox,
+            "class_segmentation": an.cls_mask,
+            "instance_segmentation": an.inst_mask,
+            "part_segmentation": an.part_mask,
+            "annotation": example["annotation"],
         }
 
 
 import functools
 
 
-class CroppedPascalPartDataset(PascalPartDataset):
+class CroppedPascalPartDataset(voc_utils.CroppedPascalVOC):
+    def __init__(
+        self,
+        VOC_root_dir,
+        dir_cropped_csv,
+        dir_Annotations_Part,
+        object_class,
+        data_split,
+    ):
+        self.dir_Annotations_Part = dir_Annotations_Part
+        super(CroppedPascalPartDataset, self).__init__(
+            VOC_root_dir, dir_cropped_csv, object_class, data_split
+        )
+
     def __getitem__(self, i):
         example = super(CroppedPascalPartDataset, self).__getitem__(i)
-        bbox = example["bbox"]
-        crop = functools.partial(crop_box, **bbox)
-        example["image"] = crop(example["image"])
-        example["class_mask"] = crop(example["class_mask"])
-        example["instance_mask"] = crop(example["instance_mask"])
-        example["part_mask"] = crop(example["part_mask"])
+        fname = example["fname"]
+        fname_im = fname + ".jpg"
+        fname_part_anno = fname + ".mat"
+        an = ImageAnnotation(
+            os.path.join(self.voc.dir_JPEGImages, fname_im),
+            os.path.join(self.dir_Annotations_Part, fname_part_anno),
+        )
+        bbox = {
+            "xmin": int(example["xmin"]),
+            "xmax": int(example["xmax"]),
+            "ymin": int(example["ymin"]),
+            "ymax": int(example["ymax"]),
+        }
+        crop = functools.partial(voc_utils.crop_box, **bbox)
+        example["image"] = crop(an.im)
+        example["class_segmentation"] = crop(an.cls_mask)
+        example["instance_segmentation"] = crop(an.inst_mask)
+        example["part_segmentation"] = crop(an.part_mask)
         return example
 
 
 if __name__ == "__main__":
 
     for image_set in voc_utils.OBJECT_CLASSES_NAMES:
-        for split in voc_utils.DATA_SPLITS:
-            dset = PascalPartDataset(
+        for split in voc_utils.DATA_SPLIT:
+            dset = voc_utils.PascalPartDataset(
                 "/media/sandro/Volume/datasets/PascalVOC/PascalParts/VOCdevkit/VOC2010",
                 "/media/sandro/Volume/datasets/PascalVOC/python_voc_devkit/csv/",
                 "/media/sandro/Volume/datasets/PascalVOC/PascalParts/trainval/Annotations_Part",

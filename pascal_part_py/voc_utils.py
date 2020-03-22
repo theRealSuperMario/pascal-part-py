@@ -1,13 +1,13 @@
-import pandas as pd
-import os
-from bs4 import BeautifulSoup
-from more_itertools import unique_everseen
-import numpy as np
-import matplotlib.pyplot as plt
-import skimage
-from skimage import io
-import xmltodict
 import enum
+import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import skimage
+import xmltodict
+from more_itertools import unique_everseen
+from skimage import io
 
 
 def crop_box(image, xmin, xmax, ymin, ymax):
@@ -21,13 +21,6 @@ def crop_box(image, xmin, xmax, ymin, ymax):
         {"xmin" : int, "xmax" : int, "ymin" : int, "ymax" : int}
     """
     return image[ymin:ymax, xmin:xmax, ...]
-
-
-# TODO: Filter out individual object classes
-# -- some images contain multiple objects. If you want to train on individual croopped images, you need to add the images multiple times int he training set insted of once.
-# image sets files only indicate if an image contains an object class or not, not how many
-# therefore, we still need to build the custom csv files
-# TODO: remove enum. It is too complicated
 
 
 class OBJECT_CLASS(enum.Enum):
@@ -55,21 +48,58 @@ class OBJECT_CLASS(enum.Enum):
 
 OBJECT_CLASS_NAMES = [o.name for o in OBJECT_CLASS]
 
-from itertools import product
 
-
-class DATA_SPLITS(enum.Enum):
+class DATA_SPLIT(enum.Enum):
     train = 0
     trainval = 1
     val = 2
 
 
-DATA_SPLIT_NAMES = [o.name for o in DATA_SPLITS]
+DATA_SPLIT_NAMES = [o.name for o in DATA_SPLIT]
+
+
+# 1. Docstrings
+# 2. Pascal Parts dataset
 
 
 class PascalVOCDataset:
     def __init__(self, dir_VOC_root, object_class, data_split):
-        self.voc = VOCUtils(dir_VOC_root)
+        """Dataset class for PASCAL VOC 20xx. 
+        Iterates over single images. Annotations contain bounding boxes for objects in the image. 
+        There can be multiple objects in an image, therefore annotations may contain multiple object annotations.
+        Returns only annotations, not images. Inherit your own subclass for data loading.
+
+        For instance, Pascal VOC2010 train set contains 4998 images, thus the length of this dataset is 4998
+
+        See examples and demo for further usage.
+        
+        Parameters
+        ----------
+        dir_VOC_root : str
+            path to VOC root, i.e. 'xxx/VOCdevkit/VOC20xx'.
+        object_class : OBJECT_CLASS or None
+            object class to use. If `None`, will use entire data split.
+        data_split : DATA_SPLIT
+            data split to use, i.e. "train", "val", "trainval"
+
+
+        Examples
+        --------
+
+            # Load only aeroplane class from train split
+            dset = voc_utils.PascalVOCDataset(
+                DIR_VOC_ROOT, voc_utils.OBJECT_CLASS.aeroplane, voc_utils.DATA_SPLIT.train
+            )
+            assert len(dset) == 283  # pascal VOC 2010
+
+            # load entire train set
+            dset = voc_utils.PascalVOCDataset(
+                DIR_VOC_ROOT, None, voc_utils.DATA_SPLIT.train
+            )
+            assert len(dset) == 4998  # pascal VOC 2010
+
+        """
+        self.voc = VOCLoader(dir_VOC_root)
         self.image_set = self.voc.get_image_set(object_class, data_split)
         self.files = self.voc.load_image_set_as_list(self.image_set)
 
@@ -83,21 +113,73 @@ class PascalVOCDataset:
         return annotation
 
 
-class CroppedPascalVOC(PascalVOCDataset):
+class CroppedPascalVOC:
     def __init__(self, dir_VOC_root, dir_cropped_csv, object_class, data_split):
-        self.voc = VOCUtils(dir_VOC_root)
+        """Dataset class for iterating over every single annotated object box in the Pascal dataset.
+        
+        In the Pascal dataset, annotations per image can contain multiple object bounding boxes.
+        If you want to crop every object out of the image and iterate over those crops, use this class.
+
+        For instance, Pascal VOC2010 train set contains 4998 images, but 13339 annotated objects. 
+        Thus the length of this dataset is 13339.
+
+        You can filter by `object_class` and data split.
+
+        
+        To prevent figuring out the object boxes every time this class is instantiated,
+        the data is stored in separate csv files in `dir_cropped_csv` and reloaded.
+        I recommend NOT setting `dir_cropped_csv` to a subdir within the vOC dataset, but 
+        to some other path.
+
+        
+        Parameters
+        ----------
+        dir_VOC_root : str
+            path to VOC root, i.e. 'xxx/VOCdevkit/VOC20xx'.
+        dir_cropped_csv : str
+            path to directory where to store intermediate csv files. Preferrably NOT within VOC subdirectory.
+        object_class : OBJECT_CLASS or None
+            object class to use. If `None`, will use entire data split.
+        data_split : DATA_SPLIT
+            data split to use, i.e. "train", "val", "trainval"
+
+        Examples
+        --------
+
+            csv_dir = tmpdir.mkdir("csv")
+            dset = voc_utils.CroppedPascalVOC(
+                DIR_VOC_ROOT,
+                csv_dir,
+                voc_utils.OBJECT_CLASS.aeroplane,
+                voc_utils.DATA_SPLIT.train,
+            )
+            ex = dset[0]
+            assert len(dset) == 403  # pascal VOC 2010
+        """
+        self.voc = VOCLoader(dir_VOC_root)
         self.dir_cropped_csv = dir_cropped_csv
         self.files = self.voc.load_object_class_cropped_as_list(
             object_class, data_split, dir_cropped_csv
         )
-        # files is a list of {"fname" : xxx.jpg, "bbox" : {"xmin" : xmin, "ymin" : ymin}}
+        # files is a list of {"fname" : xxx.jpg, "xmin" : xmin, "ymin" : ymin, ...}
+
+    def __len__(self):
+        return len(self.files)
 
     def __getitem__(self, i):
         return self.files[i]
 
 
-class VOCUtils:
+class VOCLoader:
     def __init__(self, dir_VOC_root):
+        """Utility class to work with PASCAL VOC20xx dataset
+        
+        Parameters
+        ----------
+        dir_VOC_root : str
+            path to VOC root, i.e. 'xxx/VOCdevkit/VOC20xx'.
+        """
+
         self.dir_VOC_root = dir_VOC_root
         self.dir_JPEGImages = os.path.join(dir_VOC_root, "JPEGImages")
         self.dir_Annotations = os.path.join(dir_VOC_root, "Annotations")
@@ -122,7 +204,7 @@ class VOCUtils:
 
     @property
     def JPEG_files(self):
-        """ returns absolute paths of annotation xml files """
+        """ returns absolute paths of .jpg image files """
         files = self.filenames
         files = sorted(
             list(map(lambda x: os.path.join(self.dir_JPEGImages, x + ".jpg"), files))
@@ -134,11 +216,23 @@ class VOCUtils:
         """ returns list of filenames within the dataset (without extension) """
         return self._files
 
-    def load_image_set(
+    def load_main_image_set(
         self, image_set,
     ):
+        """ load image set file from ImageSets/Main folder.
+        
+        Parameters
+        ----------
+        image_set : str
+            filename without extentions to image set.
+        
+        Returns
+        -------
+        pd.DataFrame
+            dataFrame with image set contents
+        """
         # TODO: maybe pandas is smart enough so that I don't need the if case here. But I am not sure.
-        if image_set in [d.name for d in DATA_SPLITS]:
+        if image_set in [d.name for d in DATA_SPLIT]:
             "train, val and trainval do not have column which indicates if object class is in image"
             df = pd.read_csv(
                 os.path.join(self.dir_ImageSetMain, image_set + ".txt"),
@@ -169,10 +263,10 @@ class VOCUtils:
         Returns:
             list of srings: all filenames from that category
         """
-        df = self.load_image_set(image_set)
+        df = self.load_main_image_set(image_set)
         return df.fname.values
 
-    def get_annotationpath_from_fname(self, img_name):
+    def get_annotationpath_from_fname(self, fname):
         """
         Given an image name `img_name` (without .jpg extensions), get the annotation file for that image.(dir_Annotations/img_name + .xml).
 
@@ -183,7 +277,7 @@ class VOCUtils:
         Returns:
             string: file path to the annotation file
         """
-        return os.path.join(self.dir_Annotations, img_name) + ".xml"
+        return os.path.join(self.dir_Annotations, fname) + ".xml"
 
     def load_annotation(self, annotation_file):
         """
@@ -268,13 +362,31 @@ class VOCUtils:
         if object_class is not None:
             image_set = "{}_{}".format(object_class.name, data_split.name)
         else:
-            # allows to use train, val and trainval without specifying object class, to entire set is used.
+            # allows to use train, val and trainval without specifying object class.
+            # this allows using the entire set to be used.
             image_set = data_split.name
         return image_set
 
     def _make_object_class_cropped_data(
         self, object_class, data_split, dir_cropped_csv
     ):
+        """Iterate over annotations and collect each object box annotation individually.
+        Then save the resulting dataset into a csv file in `dir_cropped_csv`
+        
+        Parameters
+        ----------
+        object_class : OBJECT_CLASS or None
+            object class to use. If `None`, will use entire data split.
+        data_split : DATA_SPLIT
+            data split to use, i.e. "train", "val", "trainval"
+        dir_cropped_csv : str
+            path to directory where to store intermediate csv files. Preferrably NOT within VOC subdirectory.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe with ["fname", "xmin", "ymin", "xmax", "ymax"] annotations for each individual object annotation.
+        """
         image_set = self.get_image_set(object_class, data_split)
 
         filename_csv = os.path.join(dir_cropped_csv, image_set + ".csv")
@@ -308,204 +420,16 @@ class VOCUtils:
         df.to_csv(filename_csv)
         return df
 
-    def get_image_url_list(self, category, data_type=None):
-        """
-        For a given data type, returns a list of filenames.
 
-        Args:
-            category (string): Category name as a string (from list_image_sets())
-            data_type (string, optional): "train" or "val"
+def object_class_name2object_class_id(object_class_name):
+    """
+    Transform a category name to an id number alphabetically.
 
-        Returns:
-            list of strings: list of all filenames for that particular category
-        """
-        df = self.load_object_class_cropped(category, split=data_type)
-        image_url_list = list(unique_everseen(list(self.dir_JPEGImages + df["fname"])))
-        return image_url_list
+    Args:
+        cat_name (string): Category name as a string (from list_image_sets())
 
-    def get_masks(self, cat_name, data_type, mask_type=None):
-        """
-        Return a list of masks for a given category and data_type.
-
-        Args:
-            cat_name (string): Category name as a string (from list_image_sets())
-            data_type (string, optional): "train" or "val"
-            mask_type (string, optional): either "bbox1" or "bbox2" - whether to
-                sum or add the masks for multiple objects
-
-        Raises:
-            ValueError: if mask_type is not valid
-
-        Returns:
-            list of np arrays: list of np arrays that are masks for the images
-                in the particular category.
-        """
-        # change this to searching through the df
-        # for the bboxes instead of relying on the order
-        # so far, should be OK since I'm always loading
-        # the df from disk anyway
-        # mask_type should be bbox1 or bbox
-        if mask_type is None:
-            raise ValueError("Must provide mask_type")
-        df = self.load_object_class_cropped(cat_name, split=data_type)
-        # load each image, turn into a binary mask
-        masks = []
-        prev_url = ""
-        blank_img = None
-        for row_num, entry in df.iterrows():
-            img_url = os.path.join(self.dir_JPEGImages, entry["fname"])
-            if img_url != prev_url:
-                if blank_img is not None:
-                    # TODO: options for how to process the masks
-                    # make sure the mask is from 0 to 1
-                    max_val = blank_img.max()
-                    if max_val > 0:
-                        min_val = blank_img.min()
-                        # print "min val before normalizing: ", min_val
-                        # start at zero
-                        blank_img -= min_val
-                        # print "max val before normalizing: ", max_val
-                        # max val at 1
-                        blank_img /= max_val
-                    masks.append(blank_img)
-                prev_url = img_url
-                img = self.load_img(img_url)
-                blank_img = np.zeros((img.shape[0], img.shape[1], 1))
-            bbox = [entry["xmin"], entry["ymin"], entry["xmax"], entry["ymax"]]
-            if mask_type == "bbox1":
-                blank_img[bbox[1] : bbox[3], bbox[0] : bbox[2]] = 1.0
-            elif mask_type == "bbox2":
-                blank_img[bbox[1] : bbox[3], bbox[0] : bbox[2]] += 1.0
-            else:
-                raise ValueError("Not a valid mask type")
-        # TODO: options for how to process the masks
-        # make sure the mask is from 0 to 1
-        max_val = blank_img.max()
-        if max_val > 0:
-            min_val = blank_img.min()
-            # print "min val before normalizing: ", min_val
-            # start at zero
-            blank_img -= min_val
-            # print "max val before normalizing: ", max_val
-            # max val at 1
-            blank_img /= max_val
-        masks.append(blank_img)
-        return np.array(masks)
-
-    def get_imgs(self, cat_name, data_type=None):
-        """
-        Load and return all the images for a particular category.
-
-        Args:
-            cat_name (string): Category name as a string (from list_image_sets())
-            data_type (string, optional): "train" or "val"
-
-        Returns:
-            np array of images: np array of loaded images for the category
-                and data_type.
-        """
-        image_url_list = self.get_image_url_list(cat_name, data_type=data_type)
-        imgs = []
-        for url in image_url_list:
-            imgs.append(self.load_img(url))
-        return np.array(imgs)
-
-    def display_image_and_mask(self, img, mask):
-        """
-        Display an image and it's mask side by side.
-
-        Args:
-            img (np array): the loaded image as a np array
-            mask (np array): the loaded mask as a np array
-        """
-        plt.figure(1)
-        plt.clf()
-        ax1 = plt.subplot(1, 2, 1)
-        ax2 = plt.subplot(1, 2, 2)
-        ax1.imshow(img)
-        ax1.set_title("Original image")
-        ax2.imshow(mask)
-        ax2.set_title("Mask")
-        plt.show(block=False)
-
-    def cat_name_to_cat_id(self, object_class):
-        """
-        Transform a category name to an id number alphabetically.
-
-        Args:
-            cat_name (string): Category name as a string (from list_image_sets())
-
-        Returns:
-            int: the integer that corresponds to the category name
-        """
-        return OBJECT_CLASS_NAMES.index[object_class]
-
-    def display_img_and_masks(self, img, true_mask, predicted_mask, block=False):
-        """
-        Display an image and it's two masks side by side.
-
-        Args:
-            img (np array): image as a np array
-            true_mask (np array): true mask as a np array
-            predicted_mask (np array): predicted_mask as a np array
-            block (bool, optional): whether to display in a blocking manner or not.
-                Default to False (non-blocking)
-        """
-        m_predicted_color = predicted_mask.reshape(
-            predicted_mask.shape[0], predicted_mask.shape[1]
-        )
-        m_true_color = true_mask.reshape(true_mask.shape[0], true_mask.shape[1])
-        # m_predicted_color = predicted_mask
-        # m_true_color = true_mask
-        # plt.close(1)
-        plt.figure(1)
-        plt.clf()
-        plt.axis("off")
-        f, (ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=3, num=1)
-        # f.clf()
-        ax1.get_xaxis().set_ticks([])
-        ax2.get_xaxis().set_ticks([])
-        ax3.get_xaxis().set_ticks([])
-        ax1.get_yaxis().set_ticks([])
-        ax2.get_yaxis().set_ticks([])
-        ax3.get_yaxis().set_ticks([])
-
-        ax1.imshow(img)
-        ax2.imshow(m_true_color)
-        ax3.imshow(m_predicted_color)
-        plt.draw()
-        plt.show(block=block)
-
-    def load_data_multilabel(self, data_type=None):
-        """
-        Returns a data frame for all images in a given set in multilabel format.
-
-        Args:
-            data_type (string, optional): "train" or "val"
-
-        Returns:
-            pandas DataFrame: filenames in multilabel format
-        """
-        if data_type is None:
-            raise ValueError("Must provide data_type = train or val")
-        filename = os.path.join(self.dir_ImageSets, data_type + ".txt")
-        cat_list = OBJECT_CLASS_NAMES
-        df = pd.read_csv(
-            filename, delim_whitespace=True, header=None, names=["filename"]
-        )
-        # add all the blank rows for the multilabel case
-        for cat_name in cat_list:
-            df[cat_name] = 0
-        for info in df.itertuples():
-            index = info[0]
-            fname = info[1]
-            anno = self.load_annotation(fname)
-            objs = anno.findAll("object")
-            for obj in objs:
-                obj_names = obj.findChildren("name")
-                for name_tag in obj_names:
-                    tag_name = str(name_tag.contents[0])
-                    if tag_name in cat_list:
-                        df.at[index, tag_name] = 1
-        return df
+    Returns:
+        int: the integer that corresponds to the category name
+    """
+    return OBJECT_CLASS[object_class_name].value
 
