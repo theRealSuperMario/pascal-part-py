@@ -72,8 +72,29 @@ class Test_PascalPartDataset:
             voc_utils.ANNOTATION_CLASS.aeroplane,
             voc_utils.DATA_SPLIT.train,
         )
-        ex = dset[0]
         assert len(dset) == 283  # pascal VOC 2010
+
+        object_classes = set([])
+        for i in range(4):
+            ex = dset[i]
+            image_annotation = ex["annotations_part"]
+            for obj in image_annotation.objects:
+                object_classes.add(obj.object_class)
+        assert len(set(object_classes)) == 1
+
+        dset = datasets.PascalPartDataset(
+            DIR_VOC_ROOT, DIR_ANNOTATIONS_PART, None, voc_utils.DATA_SPLIT.train,
+        )
+        assert len(dset) == 4998  # pascal VOC 2010
+        image_annotation = ex["annotations_part"]
+
+        object_classes = set([])
+        for i in range(10):
+            ex = dset[i]
+            image_annotation = ex["annotations_part"]
+            for obj in image_annotation.objects:
+                object_classes.add(obj.object_class)
+        assert len(set(object_classes)) > 1
 
 
 @pytest.mark.pascalpart
@@ -89,3 +110,29 @@ class Test_CroppedPascalPartDataset:
         )
         ex = dset[0]
         assert len(dset) == 403  # pascal VOC 2010
+
+        object_classes = set([])
+        for i in range(4):
+            ex = dset[i]
+            image_annotation = ex["annotations_part"]
+            for obj in image_annotation.objects:
+                object_classes.add(obj.object_class)
+        assert len(set(object_classes)) == 1
+
+        dset = datasets.CroppedPascalPartDataset(
+            DIR_VOC_ROOT,
+            csv_dir,
+            DIR_ANNOTATIONS_PART,
+            None,
+            voc_utils.DATA_SPLIT.train,
+        )
+        assert len(dset) == 13339  # pascal VOC 2010
+        image_annotation = ex["annotations_part"]
+
+        object_classes = set([])
+        for i in range(10):
+            ex = dset[i]
+            image_annotation = ex["annotations_part"]
+            for obj in image_annotation.objects:
+                object_classes.add(obj.object_class)
+        assert len(set(object_classes)) > 1
