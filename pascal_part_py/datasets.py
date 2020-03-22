@@ -57,7 +57,7 @@ class PascalPartDataset(voc_utils.PascalVOCDataset):
 import functools
 
 
-class CroppedPascalPartDataset(voc_utils.CroppedPascalVOC):
+class CroppedPascalPartDataset(voc_utils.CroppedPascalVOCDataset):
     def __init__(
         self,
         VOC_root_dir,

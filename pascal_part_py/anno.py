@@ -3,7 +3,8 @@ from scipy.io import loadmat
 from skimage.io import imread
 from skimage.measure import regionprops
 from pascal_part_py.part2ind import get_pimap
-
+from pascal_part_py.VOClabelcolormap import color_map
+from matplotlib import pyplot as plt
 
 PIMAP = get_pimap()
 
@@ -39,9 +40,9 @@ class ImageAnnotation(object):
         mapping between part name and index (See part2ind.py).
         """
         shape = self.imsize[:-1]  # first two dimensions, ignore color channel
-        self.cls_mask = np.zeros(shape, dtype=np.uint8)
-        self.inst_mask = np.zeros(shape, dtype=np.uint8)
-        self.part_mask = np.zeros(shape, dtype=np.uint8)
+        self.cls_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
+        self.inst_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
+        self.part_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
         for i, obj in enumerate(self.objects):
             class_ind = obj.class_ind
             mask = obj.mask
@@ -54,6 +55,25 @@ class ImageAnnotation(object):
                     part_name = p.part_name
                     pid = PIMAP[class_ind][part_name]
                     self.part_mask[p.mask > 0] = pid
+
+
+class SemanticAnnotation(np.ndarray):
+    def as_rgb(self):
+        colors = color_map(N=np.max(self) + 1)
+
+        return colors(self / np.max(self))[..., :3]  # no alpha
+
+    def __new__(cls, input_array):
+        # Input array is an already formed ndarray instance
+        # We first cast to be our class type
+        obj = np.asarray(input_array).view(cls)
+        # add the new attribute to the created instance
+        return obj
+
+    def __array_finalize__(self, obj):
+        # see InfoArray.__array_finalize__ for comments
+        if obj is None:
+            return
 
 
 class PascalBase(object):

@@ -7,7 +7,9 @@ import pandas as pd
 import skimage
 import xmltodict
 from more_itertools import unique_everseen
-from skimage import io
+import cv2
+import math
+import functools
 
 
 def crop_box(image, xmin, xmax, ymin, ymax):
@@ -100,7 +102,7 @@ class PascalVOCDataset:
 
         """
         self.voc = VOCLoader(dir_VOC_root)
-        self.image_set = self.voc.get_image_set(object_class, data_split)
+        self.image_set = get_image_set(object_class, data_split)
         self.files = self.voc.load_image_set_as_list(self.image_set)
 
     def __len__(self):
@@ -110,10 +112,17 @@ class PascalVOCDataset:
         fname = self.files[i]
         annotation_file = self.voc.get_annotationpath_from_fname(fname)
         annotation = self.voc.load_annotation(annotation_file)
-        return annotation
+
+        image_file = self.voc.get_jpegpath_from_fname(fname)
+        image = cv2.imread(image_file)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        example = annotation
+        example["image"] = image
+        return example
 
 
-class CroppedPascalVOC:
+class CroppedPascalVOCDataset:
     def __init__(self, dir_VOC_root, dir_cropped_csv, object_class, data_split):
         """Dataset class for iterating over every single annotated object box in the Pascal dataset.
         
@@ -167,7 +176,21 @@ class CroppedPascalVOC:
         return len(self.files)
 
     def __getitem__(self, i):
-        return self.files[i]
+        example = self.files[i]
+        fname = example["fname"]
+        image_file = self.voc.get_jpegpath_from_fname(fname)
+        image = cv2.imread(image_file)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        bbox = {
+            "xmin": int(example["xmin"]),
+            "xmax": int(example["xmax"]),
+            "ymin": int(example["ymin"]),
+            "ymax": int(example["ymax"]),
+        }
+        crop = functools.partial(crop_box, **bbox)
+        example["image"] = crop(image)
+        return example
 
 
 class VOCLoader:
@@ -279,6 +302,9 @@ class VOCLoader:
         """
         return os.path.join(self.dir_Annotations, fname) + ".xml"
 
+    def get_jpegpath_from_fname(self, fname):
+        return os.path.join(self.dir_JPEGImages, fname) + ".jpg"
+
     def load_annotation(self, annotation_file):
         """
         Load annotation file for a given image.
@@ -340,7 +366,7 @@ class VOCLoader:
             pandas DataFrame: df of filenames and bounding boxes
         """
 
-        image_set = self.get_image_set(object_class, data_split)
+        image_set = get_image_set(object_class, data_split)
 
         filename = os.path.join(dir_cropped_csv, image_set + ".csv")
         if os.path.isfile(filename):
@@ -357,15 +383,6 @@ class VOCLoader:
     ):
         df = self.load_object_class_cropped(object_class, data_split, dir_cropped_csv)
         return df.to_dict("records")
-
-    def get_image_set(self, object_class, data_split):
-        if object_class is not None:
-            image_set = "{}_{}".format(object_class.name, data_split.name)
-        else:
-            # allows to use train, val and trainval without specifying object class.
-            # this allows using the entire set to be used.
-            image_set = data_split.name
-        return image_set
 
     def _make_object_class_cropped_data(
         self, object_class, data_split, dir_cropped_csv
@@ -387,7 +404,7 @@ class VOCLoader:
         pd.DataFrame
             Dataframe with ["fname", "xmin", "ymin", "xmax", "ymax"] annotations for each individual object annotation.
         """
-        image_set = self.get_image_set(object_class, data_split)
+        image_set = get_image_set(object_class, data_split)
 
         filename_csv = os.path.join(dir_cropped_csv, image_set + ".csv")
         file_list = self.load_image_set_as_list(image_set)
@@ -421,6 +438,16 @@ class VOCLoader:
         return df
 
 
+def get_image_set(object_class, data_split):
+    if object_class is not None:
+        image_set = "{}_{}".format(object_class.name, data_split.name)
+    else:
+        # allows to use train, val and trainval without specifying object class.
+        # this allows using the entire set to be used.
+        image_set = data_split.name
+    return image_set
+
+
 def object_class_name2object_class_id(object_class_name):
     """
     Transform a category name to an id number alphabetically.
@@ -432,4 +459,79 @@ def object_class_name2object_class_id(object_class_name):
         int: the integer that corresponds to the category name
     """
     return OBJECT_CLASS[object_class_name].value
+
+
+def batch_to_canvas(X, cols=None):
+    """convert batch of images to canvas
+    
+    Parameters
+    ----------
+    X : np.ndarray
+        tensor of images shaped [N, H, W, C]. Images have to be in range [-1, 1]
+    cols : int, optional
+        number of columns for the final canvas, by default None
+    
+    Returns
+    -------
+    np.ndarray
+        canvas with images as grid
+    """
+    if len(X.shape) == 5:
+        # tile
+        oldX = np.array(X)
+        n_tiles = X.shape[3]
+        side = math.ceil(math.sqrt(n_tiles))
+        X = np.zeros(
+            (oldX.shape[0], oldX.shape[1] * side, oldX.shape[2] * side, oldX.shape[4]),
+            dtype=oldX.dtype,
+        )
+        # cropped images
+        for i in range(oldX.shape[0]):
+            inx = oldX[i]
+            inx = np.transpose(inx, [2, 0, 1, 3])
+            X[i] = tile(inx, side, side)
+    n_channels = X.shape[3]
+    if n_channels > 4:
+        X = X[:, :, :, :3]
+    if n_channels == 1:
+        X = np.tile(X, [1, 1, 1, 3])
+    rc = math.sqrt(X.shape[0])
+    if cols is None:
+        rows = cols = math.ceil(rc)
+    else:
+        cols = max(1, cols)
+        rows = math.ceil(X.shape[0] / cols)
+    canvas = tile(X, rows, cols)
+    return canvas
+
+
+def tile(X, rows, cols):
+    """Tile images for display.
+    
+    Parameters
+    ----------
+    X : np.ndarray
+        tensor of images shaped [N, H, W, C]. Images have to be in range [-1, 1]
+    rows : int
+        number of rows for final canvas
+    cols : int
+        number of rows for final canvas
+    
+    Returns
+    -------
+    np.ndarray
+        canvas with images as grid
+    """
+    tiling = np.zeros((rows * X.shape[1], cols * X.shape[2], X.shape[3]), dtype=X.dtype)
+    for i in range(rows):
+        for j in range(cols):
+            idx = i * cols + j
+            if idx < X.shape[0]:
+                img = X[idx, ...]
+                tiling[
+                    i * X.shape[1] : (i + 1) * X.shape[1],
+                    j * X.shape[2] : (j + 1) * X.shape[2],
+                    :,
+                ] = img
+    return tiling
 
