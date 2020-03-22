@@ -10,8 +10,8 @@ the left lower leg (llleg) and the left upper leg (luleg) of person by setting:
 pimap[15]['llleg']      = 19;               # left lower leg
 pimap[15]['luleg']      = 19;               # left upper leg
 """
-from pascal_part_py import voc_utils
-from pascal_part_py.voc_utils import ANNOTATION_CLASS
+from python_pascal_voc import voc_utils
+from python_pascal_voc.voc_utils import ANNOTATION_CLASS
 
 
 def get_class_names():

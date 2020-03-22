@@ -1,17 +1,14 @@
-import os
-import numpy as np
-import glob
-
-from pascal_part_py.pascal_part_annotation import ImageAnnotation
-
-import pandas as pd
-import os
-import numpy as np
-import matplotlib.pyplot as plt
-
-from pascal_part_py import voc_utils
 import functools
+import glob
+import os
+
 import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+from python_pascal_voc import voc_utils
+from python_pascal_voc.pascal_part_annotation import ImageAnnotation
 
 
 class PascalVOCDataset:
@@ -213,4 +210,3 @@ class CroppedPascalPartDataset(CroppedPascalVOCDataset):
         example["instance_segmentation"] = crop(an.inst_mask)
         example["part_segmentation"] = crop(an.part_mask)
         return example
-

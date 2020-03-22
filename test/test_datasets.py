@@ -1,13 +1,11 @@
 import pytest
-from pascal_part_py.datasets import PascalPartDataset
-from pascal_part_py import datasets
-from pascal_part_py import voc_utils
+from python_pascal_voc import datasets
+from python_pascal_voc import voc_utils
 import pandas as pd
 import os
 import collections
 
 DIR_VOC_ROOT = os.environ["DIR_VOC_ROOT"]
-DIR_PASCAL_CSV = os.environ["DIR_PASCAL_CSV"]
 DIR_ANNOTATIONS_PART = os.environ["DIR_ANNOTATIONS_PART"]
 
 
@@ -65,6 +63,7 @@ class Test_PascalVOCDataset:
         assert len(dset) == 4998  # pascal VOC 2010
 
 
+@pytest.mark.pascalpart
 class Test_PascalPartDataset:
     def test_dataset(self):
         dset = datasets.PascalPartDataset(
@@ -77,6 +76,7 @@ class Test_PascalPartDataset:
         assert len(dset) == 283  # pascal VOC 2010
 
 
+@pytest.mark.pascalpart
 class Test_CroppedPascalPartDataset:
     def test_dataset(self, tmpdir):
         csv_dir = tmpdir.mkdir("csvs")

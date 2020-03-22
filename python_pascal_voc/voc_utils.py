@@ -1,15 +1,15 @@
 import enum
+import functools
+import math
 import os
 
+import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import skimage
 import xmltodict
-from more_itertools import unique_everseen
-import cv2
-import math
-import functools
+from matplotlib import pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 
 
 def crop_box(image, xmin, xmax, ymin, ymax):
@@ -196,11 +196,20 @@ class VOCLoader:
         return annotation
 
     def _patch_annotation(self, annotation):
-        """ 
-        patch OrderedDict returned by `self.load_annotation` to fit into a standard format
+        """patch OrderedDict returned by `self.load_annotation` to fit into a standard format
 
         applied patches:
             * make sure that ["annotation"]["objects"] is a list, even if it contains a single object.
+        
+        Parameters
+        ----------
+        annotation : collections.OrderedDict
+            annotation as OrderedDict
+        
+        Returns
+        -------
+        collections.OrderedDict
+            annotation as OrderedDict
         """
         objects = annotation["annotation"]["object"]
         if not isinstance(objects, list):
@@ -227,18 +236,26 @@ class VOCLoader:
         return df
 
     def load_object_class_cropped(self, object_class, data_split, dir_cropped_csv):
-        """
-        Loads all the data as a pandas DataFrame for a particular category.
+        """Loads each object box annotation individually. Creates intermediate csv files, see `voc_utils.VOCLoader._make_object_class_cropped_data`.
 
-        Args:
-            category (string): Category name as a string (from list_image_sets())
-            data_type (string, optional): "train" or "val"
+        Parameters
+        ----------
+        object_class : ANNOTATION_CLASS or None
+            object class to use. If `None`, will use entire data split. See `voc_utils.OBJECT_CLASSES` for possible object classes.
+        data_split : DATA_SPLIT
+            data split to use, i.e. "train", "val", "trainval"
+        dir_cropped_csv : str
+            path to directory where to store intermediate csv files. Preferrably NOT within VOC subdirectory.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe with ["fname", "xmin", "ymin", "xmax", "ymax"] annotations for each individual object annotation.
 
-        Raises:
-            ValueError: when you don't give "train" or "val" as data_type
 
-        Returns:
-            pandas DataFrame: df of filenames and bounding boxes
+        See Also
+        --------
+        .. voc_utils.VOCLoader._make_object_class_cropped_data
         """
 
         image_set = get_image_set(object_class, data_split)
@@ -267,8 +284,8 @@ class VOCLoader:
         
         Parameters
         ----------
-        object_class : OBJECT_CLASS or None
-            object class to use. If `None`, will use entire data split.
+        object_class : ANNOTATION_CLASS or None
+            object class to use. If `None`, will use entire data split. See `voc_utils.OBJECT_CLASSES` for possible object classes.
         data_split : DATA_SPLIT
             data split to use, i.e. "train", "val", "trainval"
         dir_cropped_csv : str
@@ -314,6 +331,25 @@ class VOCLoader:
 
 
 def get_image_set(object_class, data_split):
+    """get image set from folder ImageSets/Main from object class and data split
+    
+    Parameters
+    ----------
+    object_class : ANNOTATION_CLASS or None
+        object class to use. If `None`, will use entire data split. See `voc_utils.OBJECT_CLASSES` for possible object classes.
+    data_split : DATA_SPLIT
+        data split to use, i.e. "train", "val", "trainval"
+    
+    Returns
+    -------
+    str
+        filename without .txt extension for Image set
+    
+    Raises
+    ------
+    ValueError
+        object class cannot be background or void
+    """
     if object_class in [ANNOTATION_CLASS.background, ANNOTATION_CLASS.void]:
         raise ValueError("object class cannot be background or void")
     if object_class is not None:
@@ -420,10 +456,6 @@ Python implementation of the color map function for the PASCAL VOC data set.
 Official Matlab version can be found in the PASCAL VOC devkit
 http://host.robots.ox.ac.uk/pascal/VOC/voc2012/index.html#devkit
 """
-import numpy as np
-import matplotlib.pyplot as plt
-from skimage.io import imshow
-from matplotlib.colors import LinearSegmentedColormap
 
 
 def color_map(N=256, normalized=True, matplotlib=True):
@@ -464,7 +496,7 @@ def color_map_viz():
         array[i * row_size : i * row_size + row_size, :] = cmap[i]
     array[nclasses * row_size : nclasses * row_size + row_size, :] = cmap[-1]
 
-    imshow(array)
+    plt.imshow(array)
     plt.yticks([row_size * i + row_size / 2 for i in range(nclasses + 1)], labels)
     plt.xticks([])
     plt.show()
