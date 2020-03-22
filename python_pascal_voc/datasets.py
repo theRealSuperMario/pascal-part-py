@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from python_pascal_voc import voc_utils
-from python_pascal_voc.pascal_part_annotation import ImageAnnotation
+from python_pascal_voc.pascal_part_annotation import ImageAnnotation, filter_objects
 
 
 class PascalVOCDataset:
@@ -50,6 +50,8 @@ class PascalVOCDataset:
         self.voc = voc_utils.VOCLoader(dir_VOC_root)
         self.image_set = voc_utils.get_image_set(object_class, data_split)
         self.files = self.voc.load_image_set_as_list(self.image_set)
+        self.object_class = object_class
+        self.data_split = data_split
 
     def __len__(self):
         return len(self.files)
@@ -117,6 +119,8 @@ class CroppedPascalVOCDataset:
             object_class, data_split, dir_cropped_csv
         )
         # files is a list of {"fname" : xxx.jpg, "xmin" : xmin, "ymin" : ymin, ...}
+        self.object_class = object_class
+        self.data_split = data_split
 
     def __len__(self):
         return len(self.files)
@@ -165,6 +169,16 @@ class PascalPartDataset(PascalVOCDataset):
             os.path.join(self.voc.dir_JPEGImages, fname_im),
             os.path.join(self.dir_Annotations_Part, fname_part_anno),
         )
+
+        if self.object_class not in [
+            voc_utils.ANNOTATION_CLASS.background,
+            voc_utils.ANNOTATION_CLASS.void,
+            None,
+        ]:
+            # make sure only specified object class is used
+            # self.object_class is None means use entire train set
+            filter_ = lambda x: x.object_class == self.object_class
+            an = filter_objects(filter_, an)
         return {
             "annotations_part": an,
             "image": an.im,
@@ -198,6 +212,16 @@ class CroppedPascalPartDataset(CroppedPascalVOCDataset):
             os.path.join(self.voc.dir_JPEGImages, fname_im),
             os.path.join(self.dir_Annotations_Part, fname_part_anno),
         )
+        if self.object_class not in [
+            voc_utils.ANNOTATION_CLASS.background,
+            voc_utils.ANNOTATION_CLASS.void,
+            None,
+        ]:
+            # make sure only specified object class is used
+            # self.object_class is None means use entire train set
+            filter_ = lambda x: x.object_class == self.object_class
+            an = filter_objects(filter_, an)
+
         bbox = {
             "xmin": int(example["xmin"]),
             "xmax": int(example["xmax"]),
@@ -205,6 +229,7 @@ class CroppedPascalPartDataset(CroppedPascalVOCDataset):
             "ymax": int(example["ymax"]),
         }
         crop = functools.partial(voc_utils.crop_box, **bbox)
+        example["annotations_part"] = an
         example["image"] = crop(an.im)
         example["class_segmentation"] = crop(an.cls_mask)
         example["instance_segmentation"] = crop(an.inst_mask)
