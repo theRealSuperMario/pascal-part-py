@@ -3,6 +3,11 @@
 * there are several repos on github which already address working with PASCAL VOC (see Related Projects) and PASCAL Parts.
 * for some reason, I was not able to find a repo for working with PASCAL VOC and PASCAL Parts jointly.
 * In an attempt to change this, I just merged the best repos I was able to find that suit my problem.
+* [twuilliam/pascal-part-py](https://github.com/twuilliam/pascal-part-py)
+    * the `pascal_part_annotation.py` and `pascal_part.py` code in this repo is mostly from there.
+
+* [mprat/pascal-voc-python](https://github.com/mprat/pascal-voc-python)
+    * the `voc_utils.py` code in this repo is mostly from there.
 * If you find a better way to work with PASCAL, please let me know by creating an issue.
 * If you want to have a certain feature implemented, please create an issue.
 
