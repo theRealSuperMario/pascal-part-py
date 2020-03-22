@@ -21,7 +21,15 @@ def filter_objects(func, image_annotation):
     filter_ = lambda x: x.object_class.name in ["aeroplane", "bicycle"]
     image_annotation = filter_objects(filter_, image_annotation)
     """
-    return None
+    new_objects = list(filter(func, image_annotation.objects))
+    new_image_annotation = ImageAnnotation(
+        image_annotation.impath,
+        image_annotation.annopath,
+        image_annotation.im,
+        image_annotation.imname,
+        new_objects,
+    )
+    return new_image_annotation
 
 
 class ImageAnnotation(object):
