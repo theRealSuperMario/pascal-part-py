@@ -1,26 +1,25 @@
 #!/usr/bin/env python
 import os
-import numpy as np
-import matplotlib.pylab as plt
-from skimage.io import imread
-from pascal_part_py.VOClabelcolormap import color_map
 
-from pascal_part_py import datasets, voc_utils
-from pascal_part_py.voc_utils import VOCLoader, crop_box
 import click
+import cv2
+import matplotlib.pylab as plt
+import numpy as np
+
+from python_pascal_voc import datasets, voc_utils
+from python_pascal_voc.voc_utils import VOCLoader, crop_box
+from python_pascal_voc.voc_utils import color_map
 
 DIR_VOC_ROOT = os.environ["DIR_VOC_ROOT"]
 DIR_PASCAL_CSV = os.environ["DIR_PASCAL_CSV"]
 DIR_ANNOTATIONS_PART = os.environ["DIR_ANNOTATIONS_PART"]
 
-import cv2
-
 
 @click.command()
-@click.option("-i", default=0)
-@click.option("-object-class", default="horse")
-@click.option("-data-split", default="train")
-@click.option("-out-path", default="demo.png")
+@click.option("--i", default=0)
+@click.option("--object-class", default="horse")
+@click.option("--data-split", default="train")
+@click.option("--out-path", default="demo.png")
 def main(i, object_class, data_split, out_path):
     if object_class == "None":
         object_class = None
