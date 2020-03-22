@@ -4,10 +4,24 @@ from scipy.io import loadmat
 from skimage.io import imread
 from skimage.measure import regionprops
 
+from python_pascal_voc import voc_utils
 from python_pascal_voc.pascal_part import get_pimap
 from python_pascal_voc.voc_utils import color_map
 
 PIMAP = get_pimap()
+
+
+def filter_objects(func, image_annotation):
+    """ callable, ImageAnnotation --> ImageAnnotation 
+    Iterate over image_annotation.objects and keep those objects satisfying the condition in `func`
+
+    Examples
+    --------
+
+    filter_ = lambda x: x.object_class.name in ["aeroplane", "bicycle"]
+    image_annotation = filter_objects(filter_, image_annotation)
+    """
+    return None
 
 
 class ImageAnnotation(object):
@@ -111,4 +125,5 @@ class PascalObject(PascalBase):
 class PascalPart(PascalBase):
     def __init__(self, obj):
         super(PascalPart, self).__init__(obj)
+        # TODO: introduce part enumeration for pascal part
         self.part_name = obj["part_name"][0]
