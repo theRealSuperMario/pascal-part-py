@@ -1,6 +1,6 @@
 import pytest
 from python_pascal_voc import datasets
-from python_pascal_voc import voc_utils
+from python_pascal_voc import voc_utils, pascal_part
 import pandas as pd
 import os
 import collections
@@ -136,3 +136,57 @@ class Test_CroppedPascalPartDataset:
             for obj in image_annotation.objects:
                 object_classes.add(obj.object_class)
         assert len(set(object_classes)) > 1
+
+
+import cv2
+from python_pascal_voc import voc_utils, datasets, pascal_part_annotation
+
+
+import numpy as np
+
+
+class Test_FilteredCroppedPascalParts:
+    def test_dataset(self, tmpdir):
+        csv_dir = tmpdir.mkdir("csvs")
+        part_remapping = {
+            "head": [
+                pascal_part.HORSE_PARTS.head,
+                pascal_part.HORSE_PARTS.leye,
+                pascal_part.HORSE_PARTS.reye,
+                pascal_part.HORSE_PARTS.lear,
+                pascal_part.HORSE_PARTS.rear,
+                pascal_part.HORSE_PARTS.muzzle,
+            ],
+            "neck": [pascal_part.HORSE_PARTS.neck],
+            "torso": [pascal_part.HORSE_PARTS.torso],
+            "legs": [
+                pascal_part.HORSE_PARTS.lfuleg,
+                pascal_part.HORSE_PARTS.lflleg,
+                pascal_part.HORSE_PARTS.rfuleg,
+                pascal_part.HORSE_PARTS.rflleg,
+                pascal_part.HORSE_PARTS.lbuleg,
+                pascal_part.HORSE_PARTS.lblleg,
+                pascal_part.HORSE_PARTS.rbuleg,
+                pascal_part.HORSE_PARTS.rblleg,
+                pascal_part.HORSE_PARTS.lfho,
+                pascal_part.HORSE_PARTS.rfho,
+                pascal_part.HORSE_PARTS.blho,
+                pascal_part.HORSE_PARTS.rbho,
+            ],
+            "tail": [pascal_part.HORSE_PARTS.tail],
+            "background": [voc_utils.ANNOTATION_CLASS.background],
+        }
+        dset = datasets.FilteredCroppedPascalParts(
+            DIR_VOC_ROOT,
+            csv_dir,
+            DIR_ANNOTATIONS_PART,
+            voc_utils.ANNOTATION_CLASS.horse,
+            voc_utils.DATA_SPLIT.train,
+            part_remapping,
+        )
+        ex = dset[0]
+
+        from matplotlib import pyplot as plt
+
+        fig, ax = plt.subplots(1, 1)
+        ax.imshow(ex["part_segmentation"].as_rgb())

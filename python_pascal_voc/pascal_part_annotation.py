@@ -1,4 +1,4 @@
-import numpy as np
+# import numpy as np
 from matplotlib import pyplot as plt
 from scipy.io import loadmat
 from skimage.io import imread
@@ -9,6 +9,7 @@ from python_pascal_voc.pascal_part import get_pimap
 from python_pascal_voc.voc_utils import color_map
 
 PIMAP = get_pimap()
+import numpy as np
 
 
 def filter_objects(func, image_annotation):
@@ -123,9 +124,8 @@ class PascalObject(PascalBase):
     def __init__(self, obj):
         super(PascalObject, self).__init__(obj)
 
-        self.object_class = voc_utils.ANNOTATION_CLASS[
-            str(obj["class"][0])
-        ]  # type : pascal_part_annotation.ImageAnnotation
+        self.object_class = voc_utils.ANNOTATION_CLASS[str(obj["class"][0])]
+        # type : pascal_part_annotation.ImageAnnotation
         # TODO: why is obj["class"] a numpy array?
 
         # self.object_class_index = self.object_class.value

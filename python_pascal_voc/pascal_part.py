@@ -12,6 +12,7 @@ pimap[15]['luleg']      = 19;               # left upper leg
 """
 from python_pascal_voc import voc_utils
 from python_pascal_voc.voc_utils import ANNOTATION_CLASS
+import numpy as np
 
 
 def get_class_names():
@@ -268,3 +269,52 @@ def get_pimap():
     pimap[v]["screen"] = 1
 
     return pimap
+
+
+import enum
+
+
+class COW_PARTS(enum.Enum):
+    head = 1
+    leye = 2
+    reye = 3
+    lear = 4
+    rear = 5
+    muzzle = 6
+    lhorn = 7
+    rhorn = 8
+    torso = 9
+    neck = 10
+    lfuleg = 11
+    lflleg = 12
+    rfuleg = 13
+    rflleg = 14
+    lbuleg = 15
+    lblleg = 16
+    rbuleg = 17
+    rblleg = 18
+    tail = 19
+
+
+class HORSE_PARTS(enum.Enum):
+    head = 1
+    leye = 2
+    reye = 3
+    lear = 4
+    rear = 5
+    muzzle = 6
+    torso = 9
+    neck = 10
+    lfuleg = 11
+    lflleg = 12
+    rfuleg = 13
+    rflleg = 14
+    lbuleg = 15
+    lblleg = 16
+    rbuleg = 17
+    rblleg = 18
+    tail = 19
+    lfho = 30
+    rfho = 31
+    blho = 32
+    rbho = 33

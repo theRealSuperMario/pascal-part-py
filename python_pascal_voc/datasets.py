@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from python_pascal_voc import voc_utils
+from python_pascal_voc import voc_utils, pascal_part_annotation
 from python_pascal_voc.pascal_part_annotation import ImageAnnotation, filter_objects
 
 
@@ -236,3 +236,90 @@ class CroppedPascalPartDataset(CroppedPascalVOCDataset):
         example["part_segmentation"] = crop(an.part_mask)
         return example
 
+
+class FilteredPascalParts(PascalPartDataset):
+    def __init__(
+        self,
+        VOC_root_dir,
+        dir_cropped_csv,
+        dir_Annotations_Part,
+        object_class,
+        data_split,
+        remapping,
+    ):
+        super(FilteredPascalParts, self).__init__(
+            VOC_root_dir,
+            dir_cropped_csv,
+            dir_Annotations_Part,
+            object_class,
+            data_split,
+        )
+
+        self.remapping = remapping
+
+    def __getitem__(self, i):
+        example = super(FilteredPascalParts, self).__getitem__(i)
+        part_segmentation = example["part_segmentation"]
+        unique_new_labels = list(set(list(self.remapping.keys())))
+        unique_new_labels.remove("background")
+        unique_new_labels = [
+            "background"
+        ] + unique_new_labels  # keep background as 0 label
+        part_maps = {p: part_segmentation == p for p in np.unique(part_segmentation)}
+        new_part_segmentation = np.zeros_like(part_segmentation)
+        for new_label, parts in self.remapping.items():
+            for p in parts:
+                if p.value in np.unique(part_segmentation):
+                    new_part_segmentation[part_maps[p.value]] = unique_new_labels.index(
+                        new_label
+                    )
+                else:
+                    pass
+        example["part_segmentation"] = pascal_part_annotation.SemanticAnnotation(
+            new_part_segmentation
+        )
+        return example
+
+
+class FilteredCroppedPascalParts(CroppedPascalPartDataset):
+    def __init__(
+        self,
+        VOC_root_dir,
+        dir_cropped_csv,
+        dir_Annotations_Part,
+        object_class,
+        data_split,
+        remapping,
+    ):
+        super(FilteredCroppedPascalParts, self).__init__(
+            VOC_root_dir,
+            dir_cropped_csv,
+            dir_Annotations_Part,
+            object_class,
+            data_split,
+        )
+
+        self.remapping = remapping
+
+    def __getitem__(self, i):
+        example = super(FilteredCroppedPascalParts, self).__getitem__(i)
+        part_segmentation = example["part_segmentation"]
+        unique_new_labels = list(set(list(self.remapping.keys())))
+        unique_new_labels.remove("background")
+        unique_new_labels = [
+            "background"
+        ] + unique_new_labels  # keep background as 0 label
+        part_maps = {p: part_segmentation == p for p in np.unique(part_segmentation)}
+        new_part_segmentation = np.zeros_like(part_segmentation)
+        for new_label, parts in self.remapping.items():
+            for p in parts:
+                if p.value in np.unique(part_segmentation):
+                    new_part_segmentation[part_maps[p.value]] = unique_new_labels.index(
+                        new_label
+                    )
+                else:
+                    pass
+        example["part_segmentation"] = pascal_part_annotation.SemanticAnnotation(
+            new_part_segmentation
+        )
+        return example
