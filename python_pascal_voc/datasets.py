@@ -322,4 +322,18 @@ class FilteredCroppedPascalParts(CroppedPascalPartDataset):
         example["part_segmentation"] = pascal_part_annotation.SemanticAnnotation(
             new_part_segmentation
         )
+
+        parts_bboxes = []
+        part_segmentation = example["part_segmentation"]
+        unique_labels = set(list(np.unique(part_segmentation)))
+        unique_labels.remove(0)  # remove background label
+        unique_labels = list(unique_labels)
+        for u in unique_labels:
+            segment = part_segmentation == u
+            bbox = pascal_part_annotation.BoundingBox.from_segmentation(
+                segment, label=u
+            )
+            parts_bboxes.append(bbox)
+        example["part_bboxes"] = parts_bboxes
         return example
+

@@ -5,6 +5,7 @@ from python_pascal_voc import pascal_part_annotation
 import pandas as pd
 import os
 import collections
+from matplotlib import pyplot as plt
 
 DIR_VOC_ROOT = os.environ["DIR_VOC_ROOT"]
 DIR_ANNOTATIONS_PART = os.environ["DIR_ANNOTATIONS_PART"]
@@ -248,25 +249,11 @@ class Test_PartBoundingBoxes:
         ex = dset[0]
 
         image = ex["image"]
-        # when cropping image, one has to adjust the bounding box coordinates accordingly
-        # this can easily be done by extracting the (xmin, ymin) pair from each coordinate pair of the part box
-
-        parts_bboxes = []
-        part_segmentation = ex["part_segmentation"]
-        unique_labels = set(list(np.unique(part_segmentation)))
-        unique_labels.remove(0)  # remove background label
-        unique_labels = list(unique_labels)
-        for u in unique_labels:
-            segment = part_segmentation == u
-            bbox = pascal_part_annotation.BoundingBox.from_segmentation(
-                segment, label=u
-            )
-            parts_bboxes.append(bbox)
+        parts_bboxes = ex["part_bboxes"]
 
         box_coords = [p.coords for p in parts_bboxes]
 
         overlay = voc_utils.overlay_boxes_without_labels(image, box_coords)
-        from matplotlib import pyplot as plt
 
         fig, ax = plt.subplots(1, 1)
         ax.imshow(overlay)
