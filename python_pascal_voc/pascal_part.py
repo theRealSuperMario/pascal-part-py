@@ -318,3 +318,30 @@ class HORSE_PARTS(enum.Enum):
     rfho = 31
     blho = 32
     rbho = 33
+
+
+class PERSON_PARTS(enum.Enum):
+    head = 1
+    leye = 2
+    reye = 3
+    lear = 4
+    rear = 5
+    lebrow = 6
+    rebrow = 7
+    nose = 8
+    mouth = 9
+    hair = 10
+    torso = 11
+    neck = 12
+    llarm = 13
+    luarm = 14
+    lhand = 15
+    rlarm = 16
+    ruarm = 17
+    rhand = 18
+    llleg = 19
+    luleg = 20
+    lfoot = 21
+    rlleg = 22
+    ruleg = 23
+    rfoot = 24

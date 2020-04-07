@@ -1,6 +1,7 @@
 import pytest
 from python_pascal_voc import datasets
 from python_pascal_voc import voc_utils, pascal_part
+from python_pascal_voc import pascal_part_annotation
 import pandas as pd
 import os
 import collections
@@ -205,41 +206,66 @@ class Test_PartBoundingBoxes:
     @pytest.mark.mpl_image_compare
     def test_croppedPascalVOC(self, tmpdir):
         csv_dir = tmpdir.mkdir("csv")
-        dset = datasets.CroppedPascalPartDataset(
+        part_remapping = {
+            "head": [
+                pascal_part.PERSON_PARTS.head,
+                pascal_part.PERSON_PARTS.hair,
+                pascal_part.PERSON_PARTS.leye,
+                pascal_part.PERSON_PARTS.reye,
+                pascal_part.PERSON_PARTS.lear,
+                pascal_part.PERSON_PARTS.rear,
+                pascal_part.PERSON_PARTS.nose,
+                pascal_part.PERSON_PARTS.mouth,
+                pascal_part.PERSON_PARTS.neck,
+                pascal_part.PERSON_PARTS.lebrow,
+                pascal_part.PERSON_PARTS.rebrow,
+            ],
+            "torso": [pascal_part.PERSON_PARTS.torso],
+            "legs": [
+                pascal_part.PERSON_PARTS.ruleg,
+                pascal_part.PERSON_PARTS.rlleg,
+                pascal_part.PERSON_PARTS.llleg,
+                pascal_part.PERSON_PARTS.luleg,
+            ],
+            "foot": [pascal_part.PERSON_PARTS.lfoot, pascal_part.PERSON_PARTS.rfoot],
+            "arm": [
+                pascal_part.PERSON_PARTS.ruarm,
+                pascal_part.PERSON_PARTS.rlarm,
+                pascal_part.PERSON_PARTS.llarm,
+                pascal_part.PERSON_PARTS.luarm,
+            ],
+            "hand": [pascal_part.PERSON_PARTS.lhand, pascal_part.PERSON_PARTS.rhand],
+            "background": [voc_utils.ANNOTATION_CLASS.background],
+        }
+        dset = datasets.FilteredCroppedPascalParts(
             DIR_VOC_ROOT,
             csv_dir,
             DIR_ANNOTATIONS_PART,
             voc_utils.ANNOTATION_CLASS.person,
             voc_utils.DATA_SPLIT.train,
+            part_remapping,
         )
         ex = dset[0]
 
         image = ex["image"]
         # when cropping image, one has to adjust the bounding box coordinates accordingly
         # this can easily be done by extracting the (xmin, ymin) pair from each coordinate pair of the part box
-        xmin = int(ex["xmin"])
-        ymin = int(ex["ymin"])
-        xmax = int(ex["xmax"])
-        ymax = int(ex["ymax"])
-        offset = np.array([ymin, xmin, ymin, xmin])  # skimage region props are (y, x)
-        limits = np.array([0, 0, image.shape[0], image.shape[1]])
-        # Extract bounding boxes as tight boxes around part segmentations
-        # AFAIK, pascal parts does not contain proper bounding annotations for parts, so this bootstrapping is necessary.
-        import pudb
-
-        pudb.set_trace()
 
         parts_bboxes = []
-        for p in ex["annotations_part"].objects[0].parts:
-            coords = np.array(p.props.bbox)  # pymin, pxmin, pymax, pxmax
-            offset = np.array([ymin, xmin, ymin, xmin])
-            coords = constrain_box(coords - offset, limits)
-            pymin, pxmin, pymax, pxmax = coords
-            parts_bboxes.append(np.array([pxmin, pymin, pxmax, pymax]))
+        part_segmentation = ex["part_segmentation"]
+        unique_labels = set(list(np.unique(part_segmentation)))
+        unique_labels.remove(0)  # remove background label
+        unique_labels = list(unique_labels)
+        for u in unique_labels:
+            segment = part_segmentation == u
+            bbox = pascal_part_annotation.BoundingBox.from_segmentation(
+                segment, label=u
+            )
+            parts_bboxes.append(bbox)
 
-        # parts_bboxes = [constrain_box(np.array(p.props.bbox) - offset, limits)]
+        box_coords = [p.coords for p in parts_bboxes]
 
-        overlay = voc_utils.overlay_boxes_without_labels(image, parts_bboxes)
+        overlay = voc_utils.overlay_boxes_without_labels(image, box_coords)
         from matplotlib import pyplot as plt
 
         fig, ax = plt.subplots(1, 1)

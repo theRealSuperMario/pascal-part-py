@@ -142,3 +142,18 @@ class PascalPart(PascalBase):
         super(PascalPart, self).__init__(obj)
         # TODO: introduce part enumeration for pascal part
         self.part_name = obj["part_name"][0]
+
+
+class BoundingBox:
+    def __init__(self, xmin, ymin, xmax, ymax, label=None):
+        self.coords = np.array([xmin, ymin, xmax, ymax])
+        self.label = label
+
+    @classmethod
+    def from_segmentation(cls, segmentation: np.ndarray, label=None):
+        """ segmentation must be binary """
+        if segmentation.dtype != np.bool:
+            raise TypeError("segmentation has to be boolean type")
+        props = regionprops(segmentation.astype(np.int32))[0]
+        ymin, xmin, ymax, xmax = props.bbox
+        return cls(xmin, ymin, xmax, ymax, label)
