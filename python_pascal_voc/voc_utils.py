@@ -10,6 +10,7 @@ import pandas as pd
 import xmltodict
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+from typing import *
 
 
 def crop_box(image, xmin, xmax, ymin, ymax):
@@ -500,3 +501,39 @@ def color_map_viz():
     plt.yticks([row_size * i + row_size / 2 for i in range(nclasses + 1)], labels)
     plt.xticks([])
     plt.show()
+
+
+def overlay_boxes_without_labels(
+    image: np.ndarray,
+    bboxes: List[np.ndarray],
+    colors: Union[list, np.ndarray, None] = None,
+) -> np.ndarray:
+    """Adds the predicted boxes on top of the image
+    
+    Parameters
+    ----------
+    image : np.ndarray
+        an image as returned by OpenCV
+    bboxes : List[np.ndarray]
+        list of bounding box coordinates. Each bounding box is an np.array of shape 4 with [xmin, ymin, xmax ymax]
+    colors : Union[list, np.ndarray, None], optional
+        optional list of colors to choose for bounding box overlay, by default will only use red, by default None
+    
+    Returns
+    -------
+    np.ndarray
+        image with overlaid boxes
+
+    """
+    if colors is None:
+        # choose red as color for all boxes
+        colors = [[255, 0, 0]] * len(bboxes)
+
+    for box, color in zip(bboxes, colors):
+        box = box.astype(np.int32)
+        top_left, bottom_right = list(box[:2]), list(box[2:])
+        image = cv2.rectangle(
+            image, tuple(top_left), tuple(bottom_right), tuple(color), 1
+        )
+
+    return image

@@ -190,3 +190,59 @@ class Test_FilteredCroppedPascalParts:
 
         fig, ax = plt.subplots(1, 1)
         ax.imshow(ex["part_segmentation"].as_rgb())
+
+
+def constrain_box(box, limits):
+    """ limits: xmin, ymin, xmax, ymax """
+    xmin, ymin, xmax, ymax = limits
+    xmin_, ymin_, xmax_, ymax_ = box
+    xmin_, xmax_ = np.clip(np.array([xmin_, xmax_]), xmin, xmax)
+    ymin_, ymax_ = np.clip(np.array([ymin_, ymax_]), ymin, ymax)
+    return np.array([xmin_, ymin_, xmax_, ymax_])
+
+
+class Test_PartBoundingBoxes:
+    @pytest.mark.mpl_image_compare
+    def test_croppedPascalVOC(self, tmpdir):
+        csv_dir = tmpdir.mkdir("csv")
+        dset = datasets.CroppedPascalPartDataset(
+            DIR_VOC_ROOT,
+            csv_dir,
+            DIR_ANNOTATIONS_PART,
+            voc_utils.ANNOTATION_CLASS.person,
+            voc_utils.DATA_SPLIT.train,
+        )
+        ex = dset[0]
+
+        image = ex["image"]
+        # when cropping image, one has to adjust the bounding box coordinates accordingly
+        # this can easily be done by extracting the (xmin, ymin) pair from each coordinate pair of the part box
+        xmin = int(ex["xmin"])
+        ymin = int(ex["ymin"])
+        xmax = int(ex["xmax"])
+        ymax = int(ex["ymax"])
+        offset = np.array([ymin, xmin, ymin, xmin])  # skimage region props are (y, x)
+        limits = np.array([0, 0, image.shape[0], image.shape[1]])
+        # Extract bounding boxes as tight boxes around part segmentations
+        # AFAIK, pascal parts does not contain proper bounding annotations for parts, so this bootstrapping is necessary.
+        import pudb
+
+        pudb.set_trace()
+
+        parts_bboxes = []
+        for p in ex["annotations_part"].objects[0].parts:
+            coords = np.array(p.props.bbox)  # pymin, pxmin, pymax, pxmax
+            offset = np.array([ymin, xmin, ymin, xmin])
+            coords = constrain_box(coords - offset, limits)
+            pymin, pxmin, pymax, pxmax = coords
+            parts_bboxes.append(np.array([pxmin, pymin, pxmax, pymax]))
+
+        # parts_bboxes = [constrain_box(np.array(p.props.bbox) - offset, limits)]
+
+        overlay = voc_utils.overlay_boxes_without_labels(image, parts_bboxes)
+        from matplotlib import pyplot as plt
+
+        fig, ax = plt.subplots(1, 1)
+        ax.imshow(overlay)
+
+        return fig
