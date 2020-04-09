@@ -309,25 +309,68 @@ class VOCLoader:
 
             # Iterate over objects and append each object with filename into dataframe
             objs = anno["annotation"]["object"]
-            for obj in objs:
+            for object_id, obj in enumerate(objs):
                 if object_class is None:
                     # just take all objects
                     bbox = obj["bndbox"]
-                    xmin = bbox["xmin"]
-                    ymin = bbox["ymin"]
-                    xmax = bbox["xmax"]
-                    ymax = bbox["ymax"]
-                    data.append([fname, xmin, ymin, xmax, ymax])
+                    xmin = int(bbox["xmin"])
+                    ymin = int(bbox["ymin"])
+                    xmax = int(bbox["xmax"])
+                    ymax = int(bbox["ymax"])
+                    occluded = int(obj["occluded"])
+                    truncated = int(obj["truncated"])
+                    difficult = int(obj["difficult"])
+                    data.append(
+                        [
+                            fname,
+                            xmin,
+                            ymin,
+                            xmax,
+                            ymax,
+                            object_id,
+                            occluded,
+                            truncated,
+                            difficult,
+                        ]
+                    )
                 else:
                     if obj["name"] == object_class.name:
                         bbox = obj["bndbox"]
-                        xmin = bbox["xmin"]
-                        ymin = bbox["ymin"]
-                        xmax = bbox["xmax"]
-                        ymax = bbox["ymax"]
-                        data.append([fname, xmin, ymin, xmax, ymax])
-        df = pd.DataFrame(data, columns=["fname", "xmin", "ymin", "xmax", "ymax"])
-        df.to_csv(filename_csv)
+                        xmin = int(bbox["xmin"])
+                        ymin = int(bbox["ymin"])
+                        xmax = int(bbox["xmax"])
+                        ymax = int(bbox["ymax"])
+                        occluded = int(obj["occluded"])
+                        truncated = int(obj["truncated"])
+                        difficult = int(obj["difficult"])
+                        data.append(
+                            [
+                                fname,
+                                xmin,
+                                ymin,
+                                xmax,
+                                ymax,
+                                object_id,
+                                occluded,
+                                truncated,
+                                difficult,
+                            ]
+                        )
+        df = pd.DataFrame(
+            data,
+            columns=[
+                "fname",
+                "xmin",
+                "ymin",
+                "xmax",
+                "ymax",
+                "object_id",
+                "occluded",
+                "truncated",
+                "difficult",
+            ],
+        )
+        df.to_csv(filename_csv, index=False)
         return df
 
 

@@ -13,6 +13,7 @@ pimap[15]['luleg']      = 19;               # left upper leg
 from python_pascal_voc import voc_utils
 from python_pascal_voc.voc_utils import ANNOTATION_CLASS
 import numpy as np
+import os
 
 
 def get_class_names():
@@ -73,6 +74,7 @@ def get_pimap():
 
     # [boat]
     # only has silhouette mask
+    part_index_map[ANNOTATION_CLASS.boat.value] = {}
 
     # [bottle]
     v = ANNOTATION_CLASS.bottle.value
@@ -129,6 +131,7 @@ def get_pimap():
 
     # [chair]
     # only has sihouette mask
+    part_index_map[ANNOTATION_CLASS.chair.value] = {}
 
     # [cow]
     v = ANNOTATION_CLASS.cow.value
@@ -155,6 +158,7 @@ def get_pimap():
 
     # [table]
     # only has silhouette mask
+    part_index_map[ANNOTATION_CLASS.table.value] = {}
 
     # [dog]
     part_index_map[ANNOTATION_CLASS.dog.value] = part_index_map[
@@ -231,6 +235,7 @@ def get_pimap():
 
     # [sofa]
     # only has sihouette mask
+    part_index_map[ANNOTATION_CLASS.sofa.value] = {}
 
     # [train]
     v = ANNOTATION_CLASS.train.value

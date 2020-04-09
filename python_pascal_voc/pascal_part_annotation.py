@@ -126,7 +126,7 @@ class PascalBase(object):
     def __init__(self, mask):
         self.mask = mask
         self.props = self._get_region_props()
-        ymin, xmin, ymax, xmax = props.bbox
+        ymin, xmin, ymax, xmax = self.props.bbox
         self.bbox = (xmin, ymin, xmax, ymax)
 
     def _get_region_props(self):

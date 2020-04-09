@@ -1,339 +1,200 @@
-# import functools
-# import glob
-# import os
+import functools
+import glob
+import os
 
-# import cv2
-# import matplotlib.pyplot as plt
-# import numpy as np
-# import pandas as pd
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
-# from python_pascal_voc import voc_utils, pascal_part_annotation
-# from python_pascal_voc.pascal_part_annotation import filter_objects
+from python_pascal_voc import voc_utils, pascal_part_annotation
+from PIL import Image
 
+import sys
 
-# class PascalVOCDataset:
-#     def __init__(self, dir_VOC_root, object_class, data_split):
-#         """Dataset class for PASCAL VOC 20xx.
-#         Iterates over single images. Annotations contain bounding boxes for objects in the image.
-#         There can be multiple objects in an image, therefore annotations may contain multiple object annotations.
-
-#         For instance, Pascal VOC2010 train set contains 4998 images, thus the length of this dataset is 4998
-
-#         See examples and demo for further usage.
-
-#         Parameters
-#         ----------
-#         dir_VOC_root : str
-#             path to VOC root, i.e. 'xxx/VOCdevkit/VOC20xx'.
-#         object_class : OBJECT_CLASS or None
-#             object class to use. If `None`, will use entire data split.
-#         data_split : DATA_SPLIT
-#             data split to use, i.e. "train", "val", "trainval"
+if sys.version_info[0] == 2:
+    import xml.etree.cElementTree as ET
+else:
+    import xml.etree.ElementTree as ET
 
 
-#         Examples
-#         --------
-
-#             # Load only aeroplane class from train split
-#             dset = voc_utils.PascalVOCDataset(
-#                 DIR_VOC_ROOT, voc_utils.OBJECT_CLASS.aeroplane, voc_utils.DATA_SPLIT.train
-#             )
-#             assert len(dset) == 283  # pascal VOC 2010
-
-#             # load entire train set
-#             dset = voc_utils.PascalVOCDataset(
-#                 DIR_VOC_ROOT, None, voc_utils.DATA_SPLIT.train
-#             )
-#             assert len(dset) == 4998  # pascal VOC 2010
-
-#         """
-#         self.voc = voc_utils.VOCLoader(dir_VOC_root)
-#         self.image_set = voc_utils.get_image_set(object_class, data_split)
-#         self.files = self.voc.load_image_set_as_list(self.image_set)
-#         self.object_class = object_class
-#         self.data_split = data_split
-
-#     def __len__(self):
-#         return len(self.files)
-
-#     def __getitem__(self, i):
-#         fname = self.files[i]
-#         annotation_file = self.voc.get_annotationpath_from_fname(fname)
-#         annotation = self.voc.load_annotation(annotation_file)
-
-#         image_file = self.voc.get_jpegpath_from_fname(fname)
-#         image = cv2.imread(image_file)
-#         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-#         example = annotation
-#         example["image"] = image
-#         return example
+from python_pascal_voc import pascal_part
 
 
-# class CroppedPascalVOCDataset:
-#     def __init__(self, dir_VOC_root, dir_cropped_csv, object_class, data_split):
-#         """Dataset class for iterating over every single annotated object box in the Pascal dataset.
+class CroppedPascalPartsDataset:
+    PART_REMAPPING = {
+        "head": [
+            pascal_part.PERSON_PARTS.head,
+            pascal_part.PERSON_PARTS.hair,
+            pascal_part.PERSON_PARTS.leye,
+            pascal_part.PERSON_PARTS.reye,
+            pascal_part.PERSON_PARTS.lear,
+            pascal_part.PERSON_PARTS.rear,
+            pascal_part.PERSON_PARTS.nose,
+            pascal_part.PERSON_PARTS.mouth,
+            pascal_part.PERSON_PARTS.neck,
+            pascal_part.PERSON_PARTS.lebrow,
+            pascal_part.PERSON_PARTS.rebrow,
+        ],
+        "torso": [pascal_part.PERSON_PARTS.torso],
+        "legs": [
+            pascal_part.PERSON_PARTS.ruleg,
+            pascal_part.PERSON_PARTS.rlleg,
+            pascal_part.PERSON_PARTS.llleg,
+            pascal_part.PERSON_PARTS.luleg,
+        ],
+        "foot": [pascal_part.PERSON_PARTS.lfoot, pascal_part.PERSON_PARTS.rfoot],
+        "arm": [
+            pascal_part.PERSON_PARTS.ruarm,
+            pascal_part.PERSON_PARTS.rlarm,
+            pascal_part.PERSON_PARTS.llarm,
+            pascal_part.PERSON_PARTS.luarm,
+        ],
+        "hand": [pascal_part.PERSON_PARTS.lhand, pascal_part.PERSON_PARTS.rhand],
+        "background": [voc_utils.ANNOTATION_CLASS.background],
+    }
+    transforms = None
 
-#         In the Pascal dataset, annotations per image can contain multiple object bounding boxes.
-#         If you want to crop every object out of the image and iterate over those crops, use this class.
+    def __init__(
+        self,
+        data_dir,
+        dir_cropped_csv,
+        split,
+        use_difficult=False,
+        use_occluded=False,
+        use_truncated=False,
+    ):
+        self.root = data_dir
+        self.voc_loader = voc_utils.VOCLoader(self.root)
+        self.image_set = "person_" + split
+        self.keep_difficult = use_difficult
+        self.use_occluded = use_occluded
 
-#         For instance, Pascal VOC2010 train set contains 4998 images, but 13339 annotated objects.
-#         Thus the length of this dataset is 13339.
+        self._annopath = os.path.join(self.root, "Annotations", "%s.xml")
+        self._partannopath = os.path.join(
+            self.root, "Annotations_Part", "%s.mat"
+        )  # TODO: make this correct
+        self._imgpath = os.path.join(self.root, "JPEGImages", "%s.jpg")
+        self._imgsetpath = os.path.join(self.root, "ImageSets", "Main", "%s.txt")
 
-#         You can filter by `object_class` and data split.
+        data_split = voc_utils.DATA_SPLIT[split]
+        ids_df = self.voc_loader.load_object_class_cropped(
+            voc_utils.ANNOTATION_CLASS.person, data_split, dir_cropped_csv
+        )
+        if not use_difficult:
+            ids_df = ids_df[ids_df.difficult != 1]
+        if not use_occluded:
+            ids_df = ids_df[ids_df.occluded != 1]
+        if not use_truncated:
+            ids_df = ids_df[ids_df.truncated != 1]
 
+        self.ids = ids_df.to_dict("records")
 
-#         To prevent figuring out the object boxes every time this class is instantiated,
-#         the data is stored in separate csv files in `dir_cropped_csv` and reloaded.
-#         I recommend NOT setting `dir_cropped_csv` to a subdir within the vOC dataset, but
-#         to some other path.
+        unique_new_labels = list(set(list(self.PART_REMAPPING.keys())))
+        if "background" in unique_new_labels:
+            unique_new_labels.remove("background")
+        unique_new_labels = [
+            "background"
+        ] + unique_new_labels  # keep background as 0 label
 
+        partindex2partname = dict(enumerate(unique_new_labels))
+        partname2partindex = {
+            v: k for k, v in dict(enumerate(unique_new_labels)).items()
+        }
+        self.class_to_ind = partname2partindex
+        self.categories = partindex2partname
 
-#         Parameters
-#         ----------
-#         dir_VOC_root : str
-#             path to VOC root, i.e. 'xxx/VOCdevkit/VOC20xx'.
-#         dir_cropped_csv : str
-#             path to directory where to store intermediate csv files. Preferrably NOT within VOC subdirectory.
-#         object_class : OBJECT_CLASS or None
-#             object class to use. If `None`, will use entire data split.
-#         data_split : DATA_SPLIT
-#             data split to use, i.e. "train", "val", "trainval"
+    def __getitem__(self, index):
+        example = self.ids[index]
+        fname = example["fname"]
+        img = Image.open(self._imgpath % fname).convert("RGB")
 
-#         Examples
-#         --------
+        target = self.get_groundtruth(index)
+        return img, target, index
 
-#             csv_dir = tmpdir.mkdir("csv")
-#             dset = voc_utils.CroppedPascalVOC(
-#                 DIR_VOC_ROOT,
-#                 csv_dir,
-#                 voc_utils.OBJECT_CLASS.aeroplane,
-#                 voc_utils.DATA_SPLIT.train,
-#             )
-#             ex = dset[0]
-#             assert len(dset) == 403  # pascal VOC 2010
-#         """
-#         self.voc = voc_utils.VOCLoader(dir_VOC_root)
-#         self.dir_cropped_csv = dir_cropped_csv
-#         self.files = self.voc.load_object_class_cropped_as_list(
-#             object_class, data_split, dir_cropped_csv
-#         )
-#         # files is a list of {"fname" : xxx.jpg, "xmin" : xmin, "ymin" : ymin, ...}
-#         self.object_class = object_class
-#         self.data_split = data_split
+    def __len__(self):
+        return len(self.ids)
 
-#     def __len__(self):
-#         return len(self.files)
+    def get_groundtruth(self, index):
+        example = self.ids[index]
+        fname = example["fname"]
+        object_id = example["object_id"]
+        anno = ET.parse(self._annopath % fname).getroot()
+        anno = self._preprocess_annotation(anno, object_id)
+        part_anno = self._preprocess_part_annotation(fname, object_id)
 
-#     def __getitem__(self, i):
-#         example = self.files[i]
-#         fname = example["fname"]
-#         image_file = self.voc.get_jpegpath_from_fname(fname)
-#         image = cv2.imread(image_file)
-#         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        target = {}
+        # target = BoxList(anno["boxes"], (width, height), mode="xyxy")
+        # target.add_field("labels", anno["labels"])
+        # target.add_field("difficult", anno["difficult"])
+        target.update(anno)
+        target.update(part_anno)
+        return target
 
-#         bbox = {
-#             "xmin": int(example["xmin"]),
-#             "xmax": int(example["xmax"]),
-#             "ymin": int(example["ymin"]),
-#             "ymax": int(example["ymax"]),
-#         }
-#         crop = functools.partial(voc_utils.crop_box, **bbox)
-#         example["image"] = crop(image)
-#         return example
+    def _preprocess_part_annotation(self, fname, object_id):
+        mat_file = self._partannopath % fname
+        part_anno = pascal_part_annotation.PartAnnotation.from_mat(mat_file)
+        selected_object = part_anno.objects[object_id]
 
+        new_object = pascal_part_annotation.remap_parts(
+            selected_object, self.PART_REMAPPING
+        )
 
-# class PascalPartDataset(PascalVOCDataset):
-#     def __init__(
-#         self, VOC_root_dir, dir_Annotations_Part, object_class, data_split,
-#     ):
-#         """Dataset to iterate over Pascal Parts Dataset
+        part_index_map = {new_object.object_class.value: new_object.partname2partid}
+        new_part_segmentation = pascal_part_annotation.get_part_mask(
+            [new_object], part_index_map
+        )
+        new_segmentation = pascal_part_annotation.get_class_mask([new_object])
+        new_instance_segmentation = pascal_part_annotation.get_instance_mask(
+            [new_object]
+        )
+        new_anno = pascal_part_annotation.PartAnnotation(
+            [new_object],
+            new_segmentation,
+            new_instance_segmentation,
+            new_part_segmentation,
+        )
 
-#         Parameters
-#         ----------
-#         VOC_root_dir : str
-#             directory from VOC 2010 or later dataset, subdirs `JPEGImages`, `Annotations`, `ImageSets/Main`
-#         dir_Annotations_Part : str
-#             directory `Annotations_Part` from pascal parts dataset, contains .mat files
-#         """
-#         self.dir_Annotations_Part = dir_Annotations_Part
-#         super(PascalPartDataset, self).__init__(VOC_root_dir, object_class, data_split)
+        boxes = [p.bbox for p in new_object.parts]
+        gt_classes = [self.class_to_ind[p.part_name] for p in new_object.parts]
+        res = {"boxes": boxes, "labels": gt_classes, "part_anno": new_anno}
+        return res
 
-#     def __getitem__(self, i):
-#         example = super(PascalPartDataset, self).__getitem__(i)
-#         fname = example["annotation"]["filename"]  # .jpg file
-#         fname = os.path.splitext(fname)[0]
-#         fname_im = fname + ".jpg"
-#         fname_part_anno = fname + ".mat"
-#         an = ImageAnnotation.from_file(
-#             os.path.join(self.voc.dir_JPEGImages, fname_im),
-#             os.path.join(self.dir_Annotations_Part, fname_part_anno),
-#         )
+    def _preprocess_annotation(self, target, object_id):
+        boxes = []
+        gt_classes = []
+        difficult_boxes = []
+        TO_REMOVE = 1
 
-#         if self.object_class not in [
-#             voc_utils.ANNOTATION_CLASS.background,
-#             voc_utils.ANNOTATION_CLASS.void,
-#             None,
-#         ]:
-#             # make sure only specified object class is used
-#             # self.object_class is None means use entire train set
-#             filter_ = lambda x: x.object_class == self.object_class
-#             an = filter_objects(filter_, an)
-#         return {
-#             "annotations_part": an,
-#             "image": an.im,
-#             "class_segmentation": an.cls_mask,
-#             "instance_segmentation": an.inst_mask,
-#             "part_segmentation": an.part_mask,
-#             "annotation": example["annotation"],
-#         }
+        objects = [obj for obj in target.iter("object")]
+        target_object = objects[object_id]
 
+        name = target_object.find("name").text.lower().strip()
+        bb = target_object.find("bndbox")
+        # Make pixel indexes 0-based
+        # Refer to "https://github.com/rbgirshick/py-faster-rcnn/blob/master/lib/datasets/pascal_voc.py#L208-L211"
+        box = [
+            bb.find("xmin").text,
+            bb.find("ymin").text,
+            bb.find("xmax").text,
+            bb.find("ymax").text,
+        ]
+        bndbox = tuple(map(lambda x: x - TO_REMOVE, list(map(int, box))))
 
-# class CroppedPascalPartDataset(CroppedPascalVOCDataset):
-#     def __init__(
-#         self,
-#         VOC_root_dir,
-#         dir_cropped_csv,
-#         dir_Annotations_Part,
-#         object_class,
-#         data_split,
-#     ):
-#         self.dir_Annotations_Part = dir_Annotations_Part
-#         super(CroppedPascalPartDataset, self).__init__(
-#             VOC_root_dir, dir_cropped_csv, object_class, data_split
-#         )
+        size = target.find("size")
+        im_info = tuple(map(int, (size.find("height").text, size.find("width").text)))
 
-#     def __getitem__(self, i):
-#         example = super(CroppedPascalPartDataset, self).__getitem__(i)
-#         fname = example["fname"]
-#         fname_im = fname + ".jpg"
-#         fname_part_anno = fname + ".mat"
-#         an = ImageAnnotation.from_file(
-#             os.path.join(self.voc.dir_JPEGImages, fname_im),
-#             os.path.join(self.dir_Annotations_Part, fname_part_anno),
-#         )
-#         if self.object_class not in [
-#             voc_utils.ANNOTATION_CLASS.background,
-#             voc_utils.ANNOTATION_CLASS.void,
-#             None,
-#         ]:
-#             # make sure only specified object class is used
-#             # self.object_class is None means use entire train set
-#             filter_ = lambda x: x.object_class == self.object_class
-#             an = filter_objects(filter_, an)
+        res = {"object_bbox": bndbox, "im_info": im_info}
+        return res
 
-#         bbox = {
-#             "xmin": int(example["xmin"]),
-#             "xmax": int(example["xmax"]),
-#             "ymin": int(example["ymin"]),
-#             "ymax": int(example["ymax"]),
-#         }
-#         crop = functools.partial(voc_utils.crop_box, **bbox)
-#         example["annotations_part"] = an
-#         example["image"] = crop(an.im)
-#         example["class_segmentation"] = crop(an.cls_mask)
-#         example["instance_segmentation"] = crop(an.inst_mask)
-#         example["part_segmentation"] = crop(an.part_mask)
-#         return example
+    def get_img_info(self, index):
+        example = self.ids[index]
+        img_id = example["fname"]
+        anno = ET.parse(self._annopath % img_id).getroot()
+        size = anno.find("size")
+        im_info = tuple(map(int, (size.find("height").text, size.find("width").text)))
+        return {"height": im_info[0], "width": im_info[1]}
 
-
-# class FilteredPascalParts(PascalPartDataset):
-#     def __init__(
-#         self,
-#         VOC_root_dir,
-#         dir_cropped_csv,
-#         dir_Annotations_Part,
-#         object_class,
-#         data_split,
-#         remapping,
-#     ):
-#         super(FilteredPascalParts, self).__init__(
-#             VOC_root_dir,
-#             dir_cropped_csv,
-#             dir_Annotations_Part,
-#             object_class,
-#             data_split,
-#         )
-
-#         self.remapping = remapping
-
-#     def __getitem__(self, i):
-#         example = super(FilteredPascalParts, self).__getitem__(i)
-#         part_segmentation = example["part_segmentation"]
-#         unique_new_labels = list(set(list(self.remapping.keys())))
-#         unique_new_labels.remove("background")
-#         unique_new_labels = [
-#             "background"
-#         ] + unique_new_labels  # keep background as 0 label
-#         part_maps = {p: part_segmentation == p for p in np.unique(part_segmentation)}
-#         new_part_segmentation = np.zeros_like(part_segmentation)
-#         for new_label, parts in self.remapping.items():
-#             for p in parts:
-#                 if p.value in np.unique(part_segmentation):
-#                     new_part_segmentation[part_maps[p.value]] = unique_new_labels.index(
-#                         new_label
-#                     )
-#                 else:
-#                     pass
-#         example["part_segmentation"] = pascal_part_annotation.SemanticAnnotation(
-#             new_part_segmentation
-#         )
-#         return example
-
-
-# class FilteredCroppedPascalParts(CroppedPascalPartDataset):
-#     def __init__(
-#         self,
-#         VOC_root_dir,
-#         dir_cropped_csv,
-#         dir_Annotations_Part,
-#         object_class,
-#         data_split,
-#         remapping,
-#     ):
-#         super(FilteredCroppedPascalParts, self).__init__(
-#             VOC_root_dir,
-#             dir_cropped_csv,
-#             dir_Annotations_Part,
-#             object_class,
-#             data_split,
-#         )
-
-#         self.remapping = remapping
-
-#     def __getitem__(self, i):
-#         example = super(FilteredCroppedPascalParts, self).__getitem__(i)
-#         part_segmentation = example["part_segmentation"]
-#         unique_new_labels = list(set(list(self.remapping.keys())))
-#         unique_new_labels.remove("background")
-#         unique_new_labels = [
-#             "background"
-#         ] + unique_new_labels  # keep background as 0 label
-#         part_maps = {p: part_segmentation == p for p in np.unique(part_segmentation)}
-#         new_part_segmentation = np.zeros_like(part_segmentation)
-#         for new_label, parts in self.remapping.items():
-#             for p in parts:
-#                 if p.value in np.unique(part_segmentation):
-#                     new_part_segmentation[part_maps[p.value]] = unique_new_labels.index(
-#                         new_label
-#                     )
-#                 else:
-#                     pass
-#         example["part_segmentation"] = pascal_part_annotation.SemanticAnnotation(
-#             new_part_segmentation
-#         )
-
-#         parts_bboxes = []
-#         part_segmentation = example["part_segmentation"]
-#         unique_labels = set(list(np.unique(part_segmentation)))
-#         unique_labels.remove(0)  # remove background label
-#         unique_labels = list(unique_labels)
-#         for u in unique_labels:
-#             segment = part_segmentation == u
-#             bbox = pascal_part_annotation.BoundingBox.from_segmentation(
-#                 segment, label=u
-#             )
-#             parts_bboxes.append(bbox)
-#         example["part_bboxes"] = parts_bboxes
-#         return example
-
+    def map_class_id_to_class_name(self, class_id):
+        pass
+        # return PascalVOCDataset.CLASSES[class_id]

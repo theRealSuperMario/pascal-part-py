@@ -8,34 +8,6 @@ import collections
 from matplotlib import pyplot as plt
 
 
-class Test_VOCutils:
-    def test_load_annotation(self, tmpdir):
-        """ load single annotation """
-        voc = voc_utils.VOCLoader(DIR_VOC_ROOT)
-        anno = voc.load_annotation(voc.annotation_files[0])
-        df = pd.DataFrame.from_dict(anno, orient="index")
-
-        assert len(df.iloc[0].object) == 1  # pascal VOC 2010
-
-        anno = voc.load_annotation(voc.annotation_files[2])
-        df = pd.DataFrame.from_dict(anno, orient="index")
-        assert len(df.iloc[0].object) == 3  # pascal VOC 2010
-
-    def test_load_object_class_cropped(self, tmpdir):
-        """ load single bounding box annotations """
-        csv_dir = tmpdir.mkdir("csv")
-        voc = voc_utils.VOCLoader(DIR_VOC_ROOT)
-        df = voc.load_object_class_cropped(
-            voc_utils.ANNOTATION_CLASS.aeroplane, voc_utils.DATA_SPLIT.train, csv_dir
-        )
-        assert len(df) == 403  # pascal VOC 2010
-        assert len(os.listdir(csv_dir)) == 1
-
-        df = voc.load_object_class_cropped(None, voc_utils.DATA_SPLIT.train, csv_dir)
-        assert len(df) == 13339  # pascal VOC 2010, all annotated objects
-        assert len(os.listdir(csv_dir)) == 2
-
-
 class Test_CroppedPascalVoc:
     def test_croppedPascalVOC(self, tmpdir):
         csv_dir = tmpdir.mkdir("csv")
@@ -256,3 +228,26 @@ class Test_PartBoundingBoxes:
         ax.imshow(overlay)
 
         return fig
+
+
+from python_pascal_voc.datasets import CroppedPascalPartsDataset
+
+
+DIR_VOC_ROOT = "/media/sandro/Volume/datasets/PascalVOC/PascalParts/VOCdevkit/VOC2010/"
+
+
+class Test_CroppedPascalPartsDataset:
+    def test_test(self, tmpdir):
+        csv_dir = tmpdir.mkdir("csv_dir")
+        split = "train"
+        dset = CroppedPascalPartsDataset(DIR_VOC_ROOT, csv_dir, split)
+        ex = dset[0]
+        assert set(list(ex[1].keys())) == set(
+            ["boxes", "labels", "im_info", "object_bbox", "part_anno"]
+        )
+        # show
+        ex[1]["part_anno"].show()
+
+        im_info = dset.get_img_info(0)
+        assert "height" in list(im_info.keys())
+        assert "width" in list(im_info.keys())
