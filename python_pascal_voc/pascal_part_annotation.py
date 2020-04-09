@@ -8,149 +8,89 @@ from python_pascal_voc import voc_utils
 from python_pascal_voc.pascal_part import get_pimap
 from python_pascal_voc.voc_utils import color_map
 
-PIMAP = get_pimap()
+PART_INDEX_MAP = get_pimap()
 import numpy as np
-
-
-def filter_objects(func, image_annotation):
-    """ callable, ImageAnnotation --> ImageAnnotation 
-    Iterate over image_annotation.objects and keep those objects satisfying the condition in `func`
-
-    Examples
-    --------
-
-    filter_ = lambda x: x.object_class.name in ["aeroplane", "bicycle"]
-    image_annotation = filter_objects(filter_, image_annotation)
-    """
-    new_objects = list(filter(func, image_annotation.objects))
-    new_image_annotation = ImageAnnotation(
-        image_annotation.impath,
-        image_annotation.annopath,
-        image_annotation.im,
-        image_annotation.imname,
-        new_objects,
-    )
-    return new_image_annotation
-
-
-def filter_objects2(func, objects):
-    """ callable, ImageAnnotation --> ImageAnnotation 
-    Iterate over image_annotation.objects and keep those objects satisfying the condition in `func`
-
-    Examples
-    --------
-
-    filter_ = lambda x: x.object_class.name in ["aeroplane", "bicycle"]
-    image_annotation = filter_objects(filter_, image_annotation)
-    """
-    new_objects = list(filter(func, objects))
-    return new_objects
-
-
-class ImageAnnotation(object):
-    @classmethod
-    def from_file(cls, impath, annopath):
-        im = imread(impath)
-        data = loadmat(annopath)["anno"][0, 0]
-        objects = []
-        for obj in data["objects"][0, :]:
-            objects.append(PascalObject(obj))
-        imname = data["imname"][0]
-
-        return cls(impath, annopath, im, imname, objects)
-
-    def __init__(self, impath, annopath, im, imname, objects):
-        # read image
-        self.impath = impath
-        self.annopath = annopath
-        self.im = im
-        self.imsize = self.im.shape
-
-        self.imname = imname
-
-        # parse objects and parts
-        self.objects = objects
-        self.n_objects = len(objects)
-
-        # create masks for objects and parts
-        self._mat2map()
-
-    def _mat2map(self):
-        """ Create masks from the annotations
-        Python implementation based on
-        http://www.stat.ucla.edu/~xianjie.chen/pascal_part_dataset/trainval.tar.gz
-
-        Read the annotation and present it in terms of 3 segmentation mask maps (
-        i.e., the class maks, instance maks and part mask). pimap defines a
-        mapping between part name and index (See part2ind.py).
-        """
-        shape = self.imsize[:-1]  # first two dimensions, ignore color channel
-        self.cls_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
-        self.inst_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
-        self.part_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
-        for i, obj in enumerate(self.objects):
-            object_class_index = obj.object_class.value
-            mask = obj.mask
-
-            self.inst_mask[mask > 0] = i + 1
-            self.cls_mask[mask > 0] = object_class_index
-
-            if obj.n_parts > 0:
-                for p in obj.parts:
-                    part_name = p.part_name
-                    pid = PIMAP[object_class_index][part_name]
-                    self.part_mask[p.mask > 0] = pid
+from typing import *
 
 
 class PartAnnotation(object):
+    cls_mask = None
+    inst_mask = None
+    part_mask = None
+    objects = None
+
     @classmethod
     def from_mat(cls, mat_file):
         data = loadmat(mat_file)["anno"][0, 0]
         objects = []
         for obj in data["objects"][0, :]:
-            objects.append(PascalObject(obj))
-        return cls(objects)
+            objects.append(PascalObject.from_mat_data(obj))
 
-    def __init__(self, objects):
+        cls_mask = get_class_mask(objects)
+        inst_mask = get_instance_mask(objects)
+        part_mask = get_part_mask(objects, PART_INDEX_MAP)
+        return cls(objects, cls_mask, inst_mask, part_mask)
+
+    def __init__(self, objects, cls_mask, inst_mask, part_mask):
         # read image
         # parse objects and parts
         self.objects = objects
-        self.n_objects = len(objects)
 
         # create masks for objects and parts
-        self._mat2map()
+        # self._mat2map()
+        self.cls_mask = cls_mask
+        self.inst_mask = inst_mask
+        self.part_mask = part_mask
 
-    def _mat2map(self):
-        """ Create masks from the annotations
-        Python implementation based on
-        http://www.stat.ucla.edu/~xianjie.chen/pascal_part_dataset/trainval.tar.gz
+    def show(self, fig=None, ax1=None, ax2=None, ax3=None):
+        if ax1 is None or ax2 is None or ax3 is None or fig is None:
+            fig, axes = plt.subplots(2, 2, figsize=(10, 10))
+            axes = axes.ravel()
+            ax1, ax2, ax3 = axes[:3]
 
-        Read the annotation and present it in terms of 3 segmentation mask maps (
-        i.e., the class maks, instance maks and part mask). pimap defines a
-        mapping between part name and index (See part2ind.py).
-        """
-        self.cls_mask = None
-        self.inst_mask = None
-        self.part_mask = None
-        for i, obj in enumerate(self.objects):
-            object_class_index = obj.object_class.value
-            mask = obj.mask
-            shape = mask.shape
-            if self.cls_mask is None:
-                self.cls_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
-            if self.inst_mask is None:
-                self.inst_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
-            if self.part_mask is None:
-                self.part_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
+        axes[0].imshow(self.cls_mask.as_rgb())
+        axes[1].imshow(self.inst_mask.as_rgb())
+        axes[2].imshow(self.part_mask.as_rgb())
+        return fig, (ax1, ax2, ax3)
 
-            self.inst_mask[mask > 0] = i + 1
-            self.cls_mask[mask > 0] = object_class_index
 
-            if obj.n_parts > 0:
-                for p in obj.parts:
-                    part_name = p.part_name
-                    pid = PIMAP[object_class_index][part_name]
-                    self.part_mask[p.mask > 0] = pid
+def get_class_mask(objects):
+    cls_mask = None
+    for i, obj in enumerate(objects):
+        object_class_index = obj.object_class.value
+        mask = obj.mask
+        shape = mask.shape
+        if cls_mask is None:
+            cls_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
+        cls_mask[mask > 0] = object_class_index
+    return cls_mask
+
+
+def get_instance_mask(objects):
+    inst_mask = None
+    for i, obj in enumerate(objects):
+        mask = obj.mask
+        shape = mask.shape
+        if inst_mask is None:
+            inst_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
+        inst_mask[mask > 0] = i + 1
+    return inst_mask
+
+
+def get_part_mask(objects, PART_INDEX_MAP):
+    part_mask = None
+    for i, obj in enumerate(objects):
+        mask = obj.mask
+        shape = mask.shape
+        object_class_index = obj.object_class.value
+        if len(obj.parts) > 0:
+            for p in obj.parts:
+                part_name = p.part_name
+                pid = PART_INDEX_MAP[object_class_index][part_name]
+                if part_mask is None:
+                    part_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
+                part_mask[p.mask > 0] = pid
+    return part_mask
 
 
 class SemanticAnnotation(np.ndarray):
@@ -173,9 +113,21 @@ class SemanticAnnotation(np.ndarray):
 
 
 class PascalBase(object):
-    def __init__(self, obj):
-        self.mask = obj["mask"]
+    mask: SemanticAnnotation = None
+    props = None
+    bbox = None
+
+    @classmethod
+    def from_mat_data(cls, data):
+        mask = data["mask"]
+        mask = SemanticAnnotation(mask)
+        return cls(mask)
+
+    def __init__(self, mask):
+        self.mask = mask
         self.props = self._get_region_props()
+        ymin, xmin, ymax, xmax = props.bbox
+        self.bbox = (xmin, ymin, xmax, ymax)
 
     def _get_region_props(self):
         """ useful properties
@@ -185,43 +137,48 @@ class PascalBase(object):
         return regionprops(self.mask)[0]
 
 
-class PascalObject(PascalBase):
-    def __init__(self, obj):
-        super(PascalObject, self).__init__(obj)
-
-        self.object_class = voc_utils.ANNOTATION_CLASS[str(obj["class"][0])]
-        # type : pascal_part_annotation.ImageAnnotation
-        # TODO: why is obj["class"] a numpy array?
-
-        # self.object_class_index = self.object_class.value
-
-        self.n_parts = obj["parts"].shape[1]
-        self.parts = []
-        if self.n_parts > 0:
-            for part in obj["parts"][0, :]:
-                self.parts.append(PascalPart(part))
-
-
 class PascalPart(PascalBase):
-    def __init__(self, obj):
-        super(PascalPart, self).__init__(obj)
-        # TODO: introduce part enumeration for pascal part
-        self.part_name = obj["part_name"][0]
+    part_name = None
+    part_index = None
 
-
-class BoundingBox:
-    def __init__(self, xmin, ymin, xmax, ymax, label=None):
-        self.coords = np.array([xmin, ymin, xmax, ymax])
-        self.label = label
+    def __init__(self, mask, partname):
+        super(PascalPart, self).__init__(mask)
+        self.part_name = partname
 
     @classmethod
-    def from_segmentation(cls, segmentation: np.ndarray, label=None):
-        """ segmentation must be binary """
-        if segmentation.dtype != np.bool:
-            raise TypeError("segmentation has to be boolean type")
-        props = regionprops(segmentation.astype(np.int32))[0]
-        ymin, xmin, ymax, xmax = props.bbox
-        return cls(xmin, ymin, xmax, ymax, label)
+    def from_mat_data(cls, data):
+        mask = data["mask"]
+        part_name = data["part_name"][0]
+        return cls(mask, part_name)
+
+
+def parts_from_part_segmentation(part_segmentation, partindex2partname):
+    """ --> List[parts] """
+    # iterate over part_segmentation_labels and generate parts
+    parts = []
+    for u in np.unique(part_segmentation):
+        if u == 0:
+            continue  # skip background label
+        mask = (part_segmentation == u) * 1
+        part_name = partindex2partname[u]
+        part = PascalPart(mask, part_name)
+        parts.append(part)
+    return parts
+
+
+def remap_parts(obj, remapping: dict):
+    part_segmentation = get_part_mask([obj], PART_INDEX_MAP)
+    (
+        remapped_part_segmentation,
+        partindex2partname,
+        partname2partindex,
+    ) = remap_part_segmentation(part_segmentation, remapping)
+
+    parts = parts_from_part_segmentation(remapped_part_segmentation, partindex2partname)
+    new_object = PascalObject(
+        obj.mask, obj.object_class, parts, partname2partindex, partindex2partname
+    )
+    return new_object
 
 
 def remap_part_segmentation(part_segmentation, remapping):
@@ -239,5 +196,40 @@ def remap_part_segmentation(part_segmentation, remapping):
                 )
             else:
                 pass
-    return SemanticAnnotation(new_part_segmentation)
+    partindex2partname = dict(enumerate(unique_new_labels))
+    partname2partindex = {v: k for k, v in dict(enumerate(unique_new_labels)).items()}
+    return (
+        SemanticAnnotation(new_part_segmentation),
+        partindex2partname,
+        partname2partindex,
+    )
+
+
+class PascalObject(PascalBase):
+    object_class: voc_utils.ANNOTATION_CLASS = None
+    parts: List[PascalPart] = None
+    partname2partid: dict = None
+    partid2partname: dict = None
+
+    def __init__(self, mask, object_class, parts, partname2partid, partid2partname):
+        super(PascalObject, self).__init__(mask)
+
+        self.object_class = object_class
+        self.parts = parts
+        self.partid2partname = partid2partname
+        self.partname2partid = partname2partid
+
+    @classmethod
+    def from_mat_data(cls, data):
+        mask = data["mask"]
+        object_class = voc_utils.ANNOTATION_CLASS[str(data["class"][0])]
+        n_parts = data["parts"].shape[1]
+        parts = []
+        if n_parts > 0:
+            for part_data in data["parts"][0, :]:
+                parts.append(PascalPart.from_mat_data(part_data))
+
+        partname2partid = PART_INDEX_MAP[object_class.value]
+        partid2partname = {v: k for k, v in PART_INDEX_MAP[object_class.value].items()}
+        return cls(mask, object_class, parts, partname2partid, partid2partname)
 

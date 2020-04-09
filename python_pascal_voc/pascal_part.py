@@ -28,204 +28,204 @@ def get_class_names():
 
 
 def get_pimap():
-    pimap = {}
+    part_index_map = {}
 
     # [aeroplane]
     v = ANNOTATION_CLASS.aeroplane.value
-    pimap[v] = {}
-    pimap[v]["body"] = 1
-    pimap[v]["stern"] = 2
-    pimap[v]["lwing"] = 3  # left wing
-    pimap[v]["rwing"] = 4  # right wing
-    pimap[v]["tail"] = 5
+    part_index_map[v] = {}
+    part_index_map[v]["body"] = 1
+    part_index_map[v]["stern"] = 2
+    part_index_map[v]["lwing"] = 3  # left wing
+    part_index_map[v]["rwing"] = 4  # right wing
+    part_index_map[v]["tail"] = 5
     for ii in range(1, 10 + 1):
-        pimap[v][("engine_%d" % ii)] = 10 + ii  # multiple engines
+        part_index_map[v][("engine_%d" % ii)] = 10 + ii  # multiple engines
     for ii in range(1, 10 + 1):
-        pimap[v][("wheel_%d" % ii)] = 20 + ii  # multiple wheels
+        part_index_map[v][("wheel_%d" % ii)] = 20 + ii  # multiple wheels
 
     # [bicycle]
     v = ANNOTATION_CLASS.bicycle.value
-    pimap[v] = {}
-    pimap[v]["fwheel"] = 1  # front wheel
-    pimap[v]["bwheel"] = 2  # back wheel
-    pimap[v]["saddle"] = 3
-    pimap[v]["handlebar"] = 4  # handle bar
-    pimap[v]["chainwheel"] = 5  # chain wheel
+    part_index_map[v] = {}
+    part_index_map[v]["fwheel"] = 1  # front wheel
+    part_index_map[v]["bwheel"] = 2  # back wheel
+    part_index_map[v]["saddle"] = 3
+    part_index_map[v]["handlebar"] = 4  # handle bar
+    part_index_map[v]["chainwheel"] = 5  # chain wheel
     for ii in range(1, 10 + 1):
-        pimap[v][("headlight_%d" % ii)] = 10 + ii
+        part_index_map[v][("headlight_%d" % ii)] = 10 + ii
 
     # [bird]
     v = ANNOTATION_CLASS.bird.value
-    pimap[v] = {}
-    pimap[v]["head"] = 1
-    pimap[v]["leye"] = 2  # left eye
-    pimap[v]["reye"] = 3  # right eye
-    pimap[v]["beak"] = 4
-    pimap[v]["torso"] = 5
-    pimap[v]["neck"] = 6
-    pimap[v]["lwing"] = 7  # left wing
-    pimap[v]["rwing"] = 8  # right wing
-    pimap[v]["lleg"] = 9  # left leg
-    pimap[v]["lfoot"] = 10  # left foot
-    pimap[v]["rleg"] = 11  # right leg
-    pimap[v]["rfoot"] = 12  # right foot
-    pimap[v]["tail"] = 13
+    part_index_map[v] = {}
+    part_index_map[v]["head"] = 1
+    part_index_map[v]["leye"] = 2  # left eye
+    part_index_map[v]["reye"] = 3  # right eye
+    part_index_map[v]["beak"] = 4
+    part_index_map[v]["torso"] = 5
+    part_index_map[v]["neck"] = 6
+    part_index_map[v]["lwing"] = 7  # left wing
+    part_index_map[v]["rwing"] = 8  # right wing
+    part_index_map[v]["lleg"] = 9  # left leg
+    part_index_map[v]["lfoot"] = 10  # left foot
+    part_index_map[v]["rleg"] = 11  # right leg
+    part_index_map[v]["rfoot"] = 12  # right foot
+    part_index_map[v]["tail"] = 13
 
     # [boat]
     # only has silhouette mask
 
     # [bottle]
     v = ANNOTATION_CLASS.bottle.value
-    pimap[v] = {}
-    pimap[v]["cap"] = 1
-    pimap[v]["body"] = 2
+    part_index_map[v] = {}
+    part_index_map[v]["cap"] = 1
+    part_index_map[v]["body"] = 2
 
     # [bus]
     v = ANNOTATION_CLASS.bus.value
-    pimap[v] = {}
-    pimap[v]["frontside"] = 1
-    pimap[v]["leftside"] = 2
-    pimap[v]["rightside"] = 3
-    pimap[v]["backside"] = 4
-    pimap[v]["roofside"] = 5
-    pimap[v]["leftmirror"] = 6
-    pimap[v]["rightmirror"] = 7
-    pimap[v]["fliplate"] = 8  # front license plate
-    pimap[v]["bliplate"] = 9  # back license plate
+    part_index_map[v] = {}
+    part_index_map[v]["frontside"] = 1
+    part_index_map[v]["leftside"] = 2
+    part_index_map[v]["rightside"] = 3
+    part_index_map[v]["backside"] = 4
+    part_index_map[v]["roofside"] = 5
+    part_index_map[v]["leftmirror"] = 6
+    part_index_map[v]["rightmirror"] = 7
+    part_index_map[v]["fliplate"] = 8  # front license plate
+    part_index_map[v]["bliplate"] = 9  # back license plate
     for ii in range(1, 10 + 1):
-        pimap[6][("door_%d" % ii)] = 10 + ii
+        part_index_map[6][("door_%d" % ii)] = 10 + ii
     for ii in range(1, 10 + 1):
-        pimap[6][("wheel_%d" % ii)] = 20 + ii
+        part_index_map[6][("wheel_%d" % ii)] = 20 + ii
     for ii in range(1, 10 + 1):
-        pimap[6][("headlight_%d" % ii)] = 30 + ii
+        part_index_map[6][("headlight_%d" % ii)] = 30 + ii
     for ii in range(1, 20 + 1):
-        pimap[6][("window_%d" % ii)] = 40 + ii
+        part_index_map[6][("window_%d" % ii)] = 40 + ii
 
     # [car]
-    pimap[ANNOTATION_CLASS.car.value] = pimap[
+    part_index_map[ANNOTATION_CLASS.car.value] = part_index_map[
         ANNOTATION_CLASS.bus.value
     ].copy()  # car has the same set of parts with bus
 
     # [cat]
     v = ANNOTATION_CLASS.cat.value
-    pimap[v] = {}
-    pimap[v]["head"] = 1
-    pimap[v]["leye"] = 2  # left eye
-    pimap[v]["reye"] = 3  # right eye
-    pimap[v]["lear"] = 4  # left ear
-    pimap[v]["rear"] = 5  # right ear
-    pimap[v]["nose"] = 6
-    pimap[v]["torso"] = 7
-    pimap[v]["neck"] = 8
-    pimap[v]["lfleg"] = 9  # left front leg
-    pimap[v]["lfpa"] = 10  # left front paw
-    pimap[v]["rfleg"] = 11  # right front leg
-    pimap[v]["rfpa"] = 12  # right front paw
-    pimap[v]["lbleg"] = 13  # left back leg
-    pimap[v]["lbpa"] = 14  # left back paw
-    pimap[v]["rbleg"] = 15  # right back leg
-    pimap[v]["rbpa"] = 16  # right back paw
-    pimap[v]["tail"] = 17
+    part_index_map[v] = {}
+    part_index_map[v]["head"] = 1
+    part_index_map[v]["leye"] = 2  # left eye
+    part_index_map[v]["reye"] = 3  # right eye
+    part_index_map[v]["lear"] = 4  # left ear
+    part_index_map[v]["rear"] = 5  # right ear
+    part_index_map[v]["nose"] = 6
+    part_index_map[v]["torso"] = 7
+    part_index_map[v]["neck"] = 8
+    part_index_map[v]["lfleg"] = 9  # left front leg
+    part_index_map[v]["lfpa"] = 10  # left front paw
+    part_index_map[v]["rfleg"] = 11  # right front leg
+    part_index_map[v]["rfpa"] = 12  # right front paw
+    part_index_map[v]["lbleg"] = 13  # left back leg
+    part_index_map[v]["lbpa"] = 14  # left back paw
+    part_index_map[v]["rbleg"] = 15  # right back leg
+    part_index_map[v]["rbpa"] = 16  # right back paw
+    part_index_map[v]["tail"] = 17
 
     # [chair]
     # only has sihouette mask
 
     # [cow]
     v = ANNOTATION_CLASS.cow.value
-    pimap[v] = {}
-    pimap[v]["head"] = 1
-    pimap[v]["leye"] = 2  # left eye
-    pimap[v]["reye"] = 3  # right eye
-    pimap[v]["lear"] = 4  # left ear
-    pimap[v]["rear"] = 5  # right ear
-    pimap[v]["muzzle"] = 6
-    pimap[v]["lhorn"] = 7  # left horn
-    pimap[v]["rhorn"] = 8  # right horn
-    pimap[v]["torso"] = 9
-    pimap[v]["neck"] = 10
-    pimap[v]["lfuleg"] = 11  # left front upper leg
-    pimap[v]["lflleg"] = 12  # left front lower leg
-    pimap[v]["rfuleg"] = 13  # right front upper leg
-    pimap[v]["rflleg"] = 14  # right front lower leg
-    pimap[v]["lbuleg"] = 15  # left back upper leg
-    pimap[v]["lblleg"] = 16  # left back lower leg
-    pimap[v]["rbuleg"] = 17  # right back upper leg
-    pimap[v]["rblleg"] = 18  # right back lower leg
-    pimap[v]["tail"] = 19
+    part_index_map[v] = {}
+    part_index_map[v]["head"] = 1
+    part_index_map[v]["leye"] = 2  # left eye
+    part_index_map[v]["reye"] = 3  # right eye
+    part_index_map[v]["lear"] = 4  # left ear
+    part_index_map[v]["rear"] = 5  # right ear
+    part_index_map[v]["muzzle"] = 6
+    part_index_map[v]["lhorn"] = 7  # left horn
+    part_index_map[v]["rhorn"] = 8  # right horn
+    part_index_map[v]["torso"] = 9
+    part_index_map[v]["neck"] = 10
+    part_index_map[v]["lfuleg"] = 11  # left front upper leg
+    part_index_map[v]["lflleg"] = 12  # left front lower leg
+    part_index_map[v]["rfuleg"] = 13  # right front upper leg
+    part_index_map[v]["rflleg"] = 14  # right front lower leg
+    part_index_map[v]["lbuleg"] = 15  # left back upper leg
+    part_index_map[v]["lblleg"] = 16  # left back lower leg
+    part_index_map[v]["rbuleg"] = 17  # right back upper leg
+    part_index_map[v]["rblleg"] = 18  # right back lower leg
+    part_index_map[v]["tail"] = 19
 
     # [table]
     # only has silhouette mask
 
     # [dog]
-    pimap[ANNOTATION_CLASS.dog.value] = pimap[
+    part_index_map[ANNOTATION_CLASS.dog.value] = part_index_map[
         ANNOTATION_CLASS.cat.value
     ].copy()  # dog has the same set of parts with cat,
     # except for the additional
     # muzzle
-    pimap[ANNOTATION_CLASS.dog.value]["muzzle"] = 20
+    part_index_map[ANNOTATION_CLASS.dog.value]["muzzle"] = 20
 
     # [horse]
     v = ANNOTATION_CLASS.horse.value
-    pimap[v] = pimap[
+    part_index_map[v] = part_index_map[
         ANNOTATION_CLASS.cow.value
     ].copy()  # horse has the same set of parts with cow,
     # except it has hoof instead of horn
-    del pimap[v]["lhorn"]
-    del pimap[v]["rhorn"]
-    pimap[v]["lfho"] = 30
-    pimap[v]["rfho"] = 31
-    pimap[v]["lbho"] = 32
-    pimap[v]["rbho"] = 33
+    del part_index_map[v]["lhorn"]
+    del part_index_map[v]["rhorn"]
+    part_index_map[v]["lfho"] = 30
+    part_index_map[v]["rfho"] = 31
+    part_index_map[v]["lbho"] = 32
+    part_index_map[v]["rbho"] = 33
 
     # [motorbike]
     v = ANNOTATION_CLASS.motorbike.value
-    pimap[v] = {}
-    pimap[v]["fwheel"] = 1
-    pimap[v]["bwheel"] = 2
-    pimap[v]["handlebar"] = 3
-    pimap[v]["saddle"] = 4
+    part_index_map[v] = {}
+    part_index_map[v]["fwheel"] = 1
+    part_index_map[v]["bwheel"] = 2
+    part_index_map[v]["handlebar"] = 3
+    part_index_map[v]["saddle"] = 4
     for ii in range(1, 10 + 1):
-        pimap[v][("headlight_%d" % ii)] = 10 + ii
+        part_index_map[v][("headlight_%d" % ii)] = 10 + ii
 
     # [person]
     v = ANNOTATION_CLASS.person.value
-    pimap[v] = {}
-    pimap[v]["head"] = 1
-    pimap[v]["leye"] = 2  # left eye
-    pimap[v]["reye"] = 3  # right eye
-    pimap[v]["lear"] = 4  # left ear
-    pimap[v]["rear"] = 5  # right ear
-    pimap[v]["lebrow"] = 6  # left eyebrow
-    pimap[v]["rebrow"] = 7  # right eyebrow
-    pimap[v]["nose"] = 8
-    pimap[v]["mouth"] = 9
-    pimap[v]["hair"] = 10
+    part_index_map[v] = {}
+    part_index_map[v]["head"] = 1
+    part_index_map[v]["leye"] = 2  # left eye
+    part_index_map[v]["reye"] = 3  # right eye
+    part_index_map[v]["lear"] = 4  # left ear
+    part_index_map[v]["rear"] = 5  # right ear
+    part_index_map[v]["lebrow"] = 6  # left eyebrow
+    part_index_map[v]["rebrow"] = 7  # right eyebrow
+    part_index_map[v]["nose"] = 8
+    part_index_map[v]["mouth"] = 9
+    part_index_map[v]["hair"] = 10
 
-    pimap[v]["torso"] = 11
-    pimap[v]["neck"] = 12
-    pimap[v]["llarm"] = 13  # left lower arm
-    pimap[v]["luarm"] = 14  # left upper arm
-    pimap[v]["lhand"] = 15  # left hand
-    pimap[v]["rlarm"] = 16  # right lower arm
-    pimap[v]["ruarm"] = 17  # right upper arm
-    pimap[v]["rhand"] = 18  # right hand
+    part_index_map[v]["torso"] = 11
+    part_index_map[v]["neck"] = 12
+    part_index_map[v]["llarm"] = 13  # left lower arm
+    part_index_map[v]["luarm"] = 14  # left upper arm
+    part_index_map[v]["lhand"] = 15  # left hand
+    part_index_map[v]["rlarm"] = 16  # right lower arm
+    part_index_map[v]["ruarm"] = 17  # right upper arm
+    part_index_map[v]["rhand"] = 18  # right hand
 
-    pimap[v]["llleg"] = 19  # left lower leg
-    pimap[v]["luleg"] = 20  # left upper leg
-    pimap[v]["lfoot"] = 21  # left foot
-    pimap[v]["rlleg"] = 22  # right lower leg
-    pimap[v]["ruleg"] = 23  # right upper leg
-    pimap[v]["rfoot"] = 24  # right foot
+    part_index_map[v]["llleg"] = 19  # left lower leg
+    part_index_map[v]["luleg"] = 20  # left upper leg
+    part_index_map[v]["lfoot"] = 21  # left foot
+    part_index_map[v]["rlleg"] = 22  # right lower leg
+    part_index_map[v]["ruleg"] = 23  # right upper leg
+    part_index_map[v]["rfoot"] = 24  # right foot
 
     # [pottedplant]
     v = ANNOTATION_CLASS.pottedplant.value
-    pimap[v] = {}
-    pimap[v]["pot"] = 1
-    pimap[v]["plant"] = 2
+    part_index_map[v] = {}
+    part_index_map[v]["pot"] = 1
+    part_index_map[v]["plant"] = 2
 
     # [sheep]
     v = ANNOTATION_CLASS.sheep.value
-    pimap[v] = pimap[
+    part_index_map[v] = part_index_map[
         ANNOTATION_CLASS.cow.value
     ].copy()  # sheep has the same set of parts with cow
 
@@ -234,41 +234,41 @@ def get_pimap():
 
     # [train]
     v = ANNOTATION_CLASS.train.value
-    pimap[v] = {}
-    pimap[v]["head"] = 1
-    pimap[v]["hfrontside"] = 2  # head front side
-    pimap[v]["hleftside"] = 3  # head left side
-    pimap[v]["hrightside"] = 4  # head right side
-    pimap[v]["hbackside"] = 5  # head back side
-    pimap[v]["hroofside"] = 6  # head roof side
+    part_index_map[v] = {}
+    part_index_map[v]["head"] = 1
+    part_index_map[v]["hfrontside"] = 2  # head front side
+    part_index_map[v]["hleftside"] = 3  # head left side
+    part_index_map[v]["hrightside"] = 4  # head right side
+    part_index_map[v]["hbackside"] = 5  # head back side
+    part_index_map[v]["hroofside"] = 6  # head roof side
 
     for ii in range(1, 10 + 1):
-        pimap[v][("headlight_%d" % ii)] = 10 + ii
+        part_index_map[v][("headlight_%d" % ii)] = 10 + ii
 
     for ii in range(1, 10 + 1):
-        pimap[v][("coach_%d" % ii)] = 20 + ii
+        part_index_map[v][("coach_%d" % ii)] = 20 + ii
 
     for ii in range(1, 10 + 1):
-        pimap[v][("cfrontside_%d" % ii)] = 30 + ii  # coach front side
+        part_index_map[v][("cfrontside_%d" % ii)] = 30 + ii  # coach front side
 
     for ii in range(1, 10 + 1):
-        pimap[v][("cleftside_%d" % ii)] = 40 + ii  # coach left side
+        part_index_map[v][("cleftside_%d" % ii)] = 40 + ii  # coach left side
 
     for ii in range(1, 10 + 1):
-        pimap[v][("crightside_%d" % ii)] = 50 + ii  # coach right side
+        part_index_map[v][("crightside_%d" % ii)] = 50 + ii  # coach right side
 
     for ii in range(1, 10 + 1):
-        pimap[v][("cbackside_%d" % ii)] = 60 + ii  # coach back side
+        part_index_map[v][("cbackside_%d" % ii)] = 60 + ii  # coach back side
 
     for ii in range(1, 10 + 1):
-        pimap[v][("croofside_%d" % ii)] = 70 + ii  # coach roof side
+        part_index_map[v][("croofside_%d" % ii)] = 70 + ii  # coach roof side
 
     # [tvmonitor]
     v = ANNOTATION_CLASS.tvmonitor.value
-    pimap[v] = {}
-    pimap[v]["screen"] = 1
+    part_index_map[v] = {}
+    part_index_map[v]["screen"] = 1
 
-    return pimap
+    return part_index_map
 
 
 import enum
