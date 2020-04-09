@@ -4,9 +4,6 @@ import pandas as pd
 import os
 import collections
 
-DIR_VOC_ROOT = os.environ["DIR_VOC_ROOT"]
-DIR_ANNOTATIONS_PART = os.environ["DIR_ANNOTATIONS_PART"]
-
 
 class Test_PascalObject:
     def test_objects(self):
@@ -44,3 +41,9 @@ class Test_PascalObject:
             filter_, image_annotation
         )
         assert len(image_annotation.objects) == 0
+
+
+class Test_PartAnnotation:
+    def test_objects(self):
+        mat_file = "/media/sandro/Volume/datasets/PascalVOC/PascalParts/trainval/Annotations_Part/2008_000002.mat"
+        part_anno = pascal_part_annotation.PartAnnotation.from_mat(mat_file)

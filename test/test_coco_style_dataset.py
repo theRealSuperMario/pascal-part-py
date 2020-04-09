@@ -10,10 +10,6 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 
-DIR_VOC_ROOT = os.environ["DIR_VOC_ROOT"]
-DIR_ANNOTATIONS_PART = os.environ["DIR_ANNOTATIONS_PART"]
-
-
 class Test_PascalPartCropped:
     @pytest.mark.mpl_image_compare
     def test_bounding_boxes(self, tmpdir):
@@ -59,13 +55,16 @@ class Test_PascalPartCropped:
             part_remapping,
         )
 
-        image, boxlist, idx = dset[0]
+        fig, axes = plt.subplots(2, 4, figsize=(16, 8))
+        axes = axes.ravel()
+        for i in range(8):
+            ax = axes[i]
+            image, boxlist, idx = dset[i]
 
-        overlay = voc_utils.overlay_boxes_without_labels(
-            np.array(image), boxlist.bbox.numpy().astype(np.int32)
-        )
+            overlay = voc_utils.overlay_boxes_without_labels(
+                np.array(image), boxlist.bbox.numpy().astype(np.int32)
+            )
 
-        fig, ax = plt.subplots(1, 1)
-        ax.imshow(overlay)
+            ax.imshow(overlay)
 
         return fig

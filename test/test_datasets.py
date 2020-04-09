@@ -7,9 +7,6 @@ import os
 import collections
 from matplotlib import pyplot as plt
 
-DIR_VOC_ROOT = os.environ["DIR_VOC_ROOT"]
-DIR_ANNOTATIONS_PART = os.environ["DIR_ANNOTATIONS_PART"]
-
 
 class Test_VOCutils:
     def test_load_annotation(self, tmpdir):

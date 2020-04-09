@@ -33,6 +33,20 @@ def filter_objects(func, image_annotation):
     return new_image_annotation
 
 
+def filter_objects2(func, objects):
+    """ callable, ImageAnnotation --> ImageAnnotation 
+    Iterate over image_annotation.objects and keep those objects satisfying the condition in `func`
+
+    Examples
+    --------
+
+    filter_ = lambda x: x.object_class.name in ["aeroplane", "bicycle"]
+    image_annotation = filter_objects(filter_, image_annotation)
+    """
+    new_objects = list(filter(func, objects))
+    return new_objects
+
+
 class ImageAnnotation(object):
     @classmethod
     def from_file(cls, impath, annopath):
@@ -77,6 +91,57 @@ class ImageAnnotation(object):
         for i, obj in enumerate(self.objects):
             object_class_index = obj.object_class.value
             mask = obj.mask
+
+            self.inst_mask[mask > 0] = i + 1
+            self.cls_mask[mask > 0] = object_class_index
+
+            if obj.n_parts > 0:
+                for p in obj.parts:
+                    part_name = p.part_name
+                    pid = PIMAP[object_class_index][part_name]
+                    self.part_mask[p.mask > 0] = pid
+
+
+class PartAnnotation(object):
+    @classmethod
+    def from_mat(cls, mat_file):
+        data = loadmat(mat_file)["anno"][0, 0]
+        objects = []
+        for obj in data["objects"][0, :]:
+            objects.append(PascalObject(obj))
+        return cls(objects)
+
+    def __init__(self, objects):
+        # read image
+        # parse objects and parts
+        self.objects = objects
+        self.n_objects = len(objects)
+
+        # create masks for objects and parts
+        self._mat2map()
+
+    def _mat2map(self):
+        """ Create masks from the annotations
+        Python implementation based on
+        http://www.stat.ucla.edu/~xianjie.chen/pascal_part_dataset/trainval.tar.gz
+
+        Read the annotation and present it in terms of 3 segmentation mask maps (
+        i.e., the class maks, instance maks and part mask). pimap defines a
+        mapping between part name and index (See part2ind.py).
+        """
+        self.cls_mask = None
+        self.inst_mask = None
+        self.part_mask = None
+        for i, obj in enumerate(self.objects):
+            object_class_index = obj.object_class.value
+            mask = obj.mask
+            shape = mask.shape
+            if self.cls_mask is None:
+                self.cls_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
+            if self.inst_mask is None:
+                self.inst_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
+            if self.part_mask is None:
+                self.part_mask = SemanticAnnotation(np.zeros(shape, dtype=np.uint8))
 
             self.inst_mask[mask > 0] = i + 1
             self.cls_mask[mask > 0] = object_class_index
@@ -157,3 +222,22 @@ class BoundingBox:
         props = regionprops(segmentation.astype(np.int32))[0]
         ymin, xmin, ymax, xmax = props.bbox
         return cls(xmin, ymin, xmax, ymax, label)
+
+
+def remap_part_segmentation(part_segmentation, remapping):
+    unique_new_labels = list(set(list(remapping.keys())))
+    if "background" in unique_new_labels:
+        unique_new_labels.remove("background")
+    unique_new_labels = ["background"] + unique_new_labels  # keep background as 0 label
+    part_maps = {p: part_segmentation == p for p in np.unique(part_segmentation)}
+    new_part_segmentation = np.zeros_like(part_segmentation)
+    for new_label, parts in remapping.items():
+        for p in parts:
+            if p.value in np.unique(part_segmentation):
+                new_part_segmentation[part_maps[p.value]] = unique_new_labels.index(
+                    new_label
+                )
+            else:
+                pass
+    return SemanticAnnotation(new_part_segmentation)
+
