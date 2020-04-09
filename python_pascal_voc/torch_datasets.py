@@ -1,86 +1,64 @@
-from maskrcnn_benchmark.structures.bounding_box import BoxList
-from maskrcnn_benchmark.structures.segmentation_mask import SegmentationMask
-from python_pascal_voc import datasets
-from PIL import Image
+import os
+import sys
+
 import torch
+import torch.utils.data
+from maskrcnn_benchmark.structures.bounding_box import BoxList
+from PIL import Image
 from torchvision.datasets import VisionDataset
 
-"""Implements datasets compliant with CocoDataset interface as used in maskrcnn_benchmark 
+from python_pascal_voc import datasets, voc_utils, pascal_part
 
 
-References
-----------
-..[1] https://github.com/facebookresearch/maskrcnn-benchmark
-"""
+from python_pascal_voc import pascal_part_annotation, datasets
 
 
-class VOCPartsCropped(VisionDataset):
+class CroppedPascalPartsDataset(datasets.CroppedPascalPartsDataset):
     def __init__(
         self,
-        root,
-        dir_cropped_csv,
-        dir_Annotations_Part,
-        object_class,
-        data_split,
-        remapping,
-        transform=None,
-        target_transform=None,
+        data_dir,
+        data_csv_dir,
+        split,
+        use_difficult=False,
+        use_occluded=False,
+        use_truncated=False,
         transforms=None,
     ):
-        # as you would do normally
-        super(VOCPartsCropped, self).__init__(
-            root, transforms, transform, target_transform
+        """dataset compliant with maskrcnn_benchmark interface """
+        super(CroppedPascalPartsDataset, self).__init__(
+            data_dir,
+            data_csv_dir,
+            split,
+            use_difficult=use_difficult,
+            use_occluded=use_occluded,
+            use_truncated=use_truncated,
         )
-        self.dset = datasets.FilteredCroppedPascalParts(
-            root,
-            dir_cropped_csv,
-            dir_Annotations_Part,
-            object_class,
-            data_split,
-            remapping,
-        )
+        self.transforms = transforms
 
-    def __getitem__(self, idx):
-        # load the image as a PIL Image
-        example = self.dset[idx]
-        image = Image.fromarray(example["image"])
+    def __getitem__(self, index):
+        img, target, index = super(CroppedPascalPartsDataset, self).__getitem__(index)
 
-        boxes = example[
-            "part_bboxes"
-        ]  # boxes ist List[np.ndarray], but we need List[List]
-        box_coords = [list(b.coords) for b in boxes]
-        box_coords = torch.as_tensor(box_coords).reshape(
-            -1, 4
-        )  # guard against no boxes
-        box_labels = [b.label for b in boxes]
+        target = target.clip_to_image(remove_empty=True)
+        if self.transforms is not None:
+            img, target = self.transforms(img, target)
 
-        # load the bounding boxes as a list of list of boxes
-        # in this case, for illustrative purposes, we use
-        # x1, y1, x2, y2 order.
-        # and labels
-        labels = torch.tensor(box_labels)
+        return img, target, index
 
-        # create a BoxList from the boxes
-        boxlist = BoxList(box_coords, image.size, mode="xyxy")
-        # add the labels to the boxlist
-        boxlist.add_field("labels", labels)
+    def get_groundtruth(self, index):
+        target_values = super(CroppedPascalPartsDataset, self).get_groundtruth(index)
 
-        # TODO: add segmentations
+        boxes = target_values["boxes"]
+        labels = target_values["labels"]
+        object_bbox = target_values["object_bbox"]
+        im_info = target_values["im_info"]
+        height, width = im_info
 
-        if self.transforms:
-            image, boxlist = self.transforms(image, boxlist)
-
-        # return the image, the boxlist and the idx in your dataset
-        return image, boxlist, idx
-
-    def get_img_info(self, idx):
-        # get img_height and img_width. This is used if
-        # we want to split the batches according to the aspect ratio
-        # of the image, as it can be more efficient than loading the
-        # image from disk
-        example = self.dset[idx]
-        image = example["image"]
-        img_height = image.shape[0]
-        img_width = image.shape[1]
-        return {"height": img_height, "width": img_width}
-
+        boxes = torch.tensor(boxes, dtype=torch.int64)
+        labels = torch.tensor(labels, dtype=torch.int64)
+        target = BoxList(boxes, (width, height), mode="xyxy")
+        target.add_field("labels", labels)
+        # TODO: currently, all boxes are easy, even if they are not.
+        # The reason for this is because I could not establish the mapping between
+        # the pascal part annotation and the pascal voc annotation
+        target.add_field("difficult", torch.zeros_like(labels, dtype=labels.dtype))
+        return target
