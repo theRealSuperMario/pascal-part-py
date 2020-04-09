@@ -124,6 +124,13 @@ class CroppedPascalPartsDataset:
         target = {}
         target.update(anno)
         target.update(part_anno)
+        """
+            boxes : List[Tuple[int]]
+            labels: List[int]
+            part_anno : pascal_part_annotation.PartAnnotation
+            object_bbox: Tuple[int]
+            im_info: [height, width]
+        """
         return target
 
     def _preprocess_part_annotation(self, fname, object_id):

@@ -16,6 +16,7 @@ from python_pascal_voc.voc_utils import ANNOTATION_CLASS
 import numpy as np
 import os
 import pandas as pd
+import tqdm
 
 
 def get_class_names():
@@ -406,7 +407,8 @@ class PascalPartLoader(voc_utils.VOCLoader):
         file_list = self.load_image_set_as_list(image_set)
         data = []
 
-        for fname in file_list:
+        print("Scanning part annotation files for objects")
+        for fname in tqdm.tqdm(file_list, position=0, leave=True, total=len(file_list)):
             annotation_filename = self.get_matfile_from_fname(fname)
             anno = self.load_part_annotation(annotation_filename)
 
