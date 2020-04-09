@@ -11,9 +11,11 @@ pimap[15]['llleg']      = 19;               # left lower leg
 pimap[15]['luleg']      = 19;               # left upper leg
 """
 from python_pascal_voc import voc_utils
+from python_pascal_voc import pascal_part_annotation
 from python_pascal_voc.voc_utils import ANNOTATION_CLASS
 import numpy as np
 import os
+import pandas as pd
 
 
 def get_class_names():
@@ -350,3 +352,126 @@ class PERSON_PARTS(enum.Enum):
     rlleg = 22
     ruleg = 23
     rfoot = 24
+
+
+class PascalPartLoader(voc_utils.VOCLoader):
+    def __init__(self, dir_VOC_root):
+        """Utility class to work with PASCAL VOC20xx dataset
+        
+        Parameters
+        ----------
+        dir_VOC_root : str
+            path to VOC root, i.e. 'xxx/VOCdevkit/VOC20xx'.
+        """
+
+        super(PascalPartLoader, self).__init__(dir_VOC_root)
+        self.dir_AnnotationsPart = os.path.join(dir_VOC_root, "Annotations_Part")
+
+    def get_matfile_from_fname(self, fname):
+        """
+        Given an image name `img_name` (without .jpg extensions), get the annotation file for that image.(dir_Annotations/img_name + .xml).
+
+        Args:
+            img_name (string): string of the image name, relative to
+                the image directory.
+
+        Returns:
+            string: file path to the annotation file
+        """
+        return os.path.join(self.dir_AnnotationsPart, fname) + ".mat"
+
+    def _make_object_class_cropped_data(
+        self, object_class, data_split, dir_cropped_csv
+    ):
+        """Iterate over annotations and collect each object box annotation individually.
+        Then save the resulting dataset into a csv file in `dir_cropped_csv`
+        
+        Parameters
+        ----------
+        object_class : ANNOTATION_CLASS or None
+            object class to use. If `None`, will use entire data split. See `voc_utils.OBJECT_CLASSES` for possible object classes.
+        data_split : DATA_SPLIT
+            data split to use, i.e. "train", "val", "trainval"
+        dir_cropped_csv : str
+            path to directory where to store intermediate csv files. Preferrably NOT within VOC subdirectory.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe with ["fname", "xmin", "ymin", "xmax", "ymax"] annotations for each individual object annotation.
+        """
+        image_set = voc_utils.get_image_set(object_class, data_split)
+
+        filename_csv = os.path.join(dir_cropped_csv, image_set + ".csv")
+        file_list = self.load_image_set_as_list(image_set)
+        data = []
+
+        for fname in file_list:
+            annotation_filename = self.get_matfile_from_fname(fname)
+            anno = self.load_part_annotation(annotation_filename)
+
+            # Iterate over objects and append each object with filename into dataframe
+            objs = anno.objects
+            for object_id, obj in enumerate(objs):
+                if object_class is None:
+                    # just take all objects
+                    xmin, ymin, xmax, ymax = obj.bbox
+                    # pascal part annotation does not provide this information and I would have to get the matching information from the .xml annotation
+                    # Currently I do not know how to actually pull this off.
+                    occluded = 0
+                    truncated = 0
+                    difficult = 0
+                    data.append(
+                        [
+                            fname,
+                            xmin,
+                            ymin,
+                            xmax,
+                            ymax,
+                            object_id,
+                            occluded,
+                            truncated,
+                            difficult,
+                        ]
+                    )
+                else:
+                    if obj.object_class == object_class:
+                        xmin, ymin, xmax, ymax = obj.bbox
+                        # pascal part annotation does not provide this information and I would have to get the matching information from the .xml annotation
+                        # Currently I do not know how to actually pull this off.
+                        occluded = 0
+                        truncated = 0
+                        difficult = 0
+                        data.append(
+                            [
+                                fname,
+                                xmin,
+                                ymin,
+                                xmax,
+                                ymax,
+                                object_id,
+                                occluded,
+                                truncated,
+                                difficult,
+                            ]
+                        )
+        df = pd.DataFrame(
+            data,
+            columns=[
+                "fname",
+                "xmin",
+                "ymin",
+                "xmax",
+                "ymax",
+                "object_id",
+                "occluded",
+                "truncated",
+                "difficult",
+            ],
+        )
+        df.to_csv(filename_csv, index=False)
+        return df
+
+    def load_part_annotation(self, mat_file_name):
+        part_annotation = pascal_part_annotation.PartAnnotation.from_mat(mat_file_name)
+        return part_annotation

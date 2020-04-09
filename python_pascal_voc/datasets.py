@@ -65,15 +65,13 @@ class CroppedPascalPartsDataset:
         use_truncated=False,
     ):
         self.root = data_dir
-        self.voc_loader = voc_utils.VOCLoader(self.root)
+        self.voc_loader = pascal_part.PascalPartLoader(self.root)
         self.image_set = "person_" + split
         self.keep_difficult = use_difficult
         self.use_occluded = use_occluded
 
         self._annopath = os.path.join(self.root, "Annotations", "%s.xml")
-        self._partannopath = os.path.join(
-            self.root, "Annotations_Part", "%s.mat"
-        )  # TODO: make this correct
+        self._partannopath = os.path.join(self.root, "Annotations_Part", "%s.mat")
         self._imgpath = os.path.join(self.root, "JPEGImages", "%s.jpg")
         self._imgsetpath = os.path.join(self.root, "ImageSets", "Main", "%s.txt")
 
@@ -124,14 +122,13 @@ class CroppedPascalPartsDataset:
         part_anno = self._preprocess_part_annotation(fname, object_id)
 
         target = {}
-        # target = BoxList(anno["boxes"], (width, height), mode="xyxy")
-        # target.add_field("labels", anno["labels"])
-        # target.add_field("difficult", anno["difficult"])
         target.update(anno)
         target.update(part_anno)
         return target
 
     def _preprocess_part_annotation(self, fname, object_id):
+        TO_REMOVE = 1  # bounding box correction by 1 pixel
+
         mat_file = self._partannopath % fname
         part_anno = pascal_part_annotation.PartAnnotation.from_mat(mat_file)
         selected_object = part_anno.objects[object_id]
@@ -157,34 +154,23 @@ class CroppedPascalPartsDataset:
 
         boxes = [p.bbox for p in new_object.parts]
         gt_classes = [self.class_to_ind[p.part_name] for p in new_object.parts]
-        res = {"boxes": boxes, "labels": gt_classes, "part_anno": new_anno}
+
+        object_bbox = new_object.bbox
+
+        bndbox = tuple(map(lambda x: x - TO_REMOVE, list(map(int, object_bbox))))
+        res = {
+            "boxes": boxes,
+            "labels": gt_classes,
+            "part_anno": new_anno,
+            "object_bbox": bndbox,
+        }
         return res
 
     def _preprocess_annotation(self, target, object_id):
-        boxes = []
-        gt_classes = []
-        difficult_boxes = []
-        TO_REMOVE = 1
-
-        objects = [obj for obj in target.iter("object")]
-        target_object = objects[object_id]
-
-        name = target_object.find("name").text.lower().strip()
-        bb = target_object.find("bndbox")
-        # Make pixel indexes 0-based
-        # Refer to "https://github.com/rbgirshick/py-faster-rcnn/blob/master/lib/datasets/pascal_voc.py#L208-L211"
-        box = [
-            bb.find("xmin").text,
-            bb.find("ymin").text,
-            bb.find("xmax").text,
-            bb.find("ymax").text,
-        ]
-        bndbox = tuple(map(lambda x: x - TO_REMOVE, list(map(int, box))))
-
         size = target.find("size")
         im_info = tuple(map(int, (size.find("height").text, size.find("width").text)))
 
-        res = {"object_bbox": bndbox, "im_info": im_info}
+        res = {"im_info": im_info}
         return res
 
     def get_img_info(self, index):
@@ -196,5 +182,4 @@ class CroppedPascalPartsDataset:
         return {"height": im_info[0], "width": im_info[1]}
 
     def map_class_id_to_class_name(self, class_id):
-        pass
-        # return PascalVOCDataset.CLASSES[class_id]
+        return self.categories[class_id]
