@@ -66,7 +66,8 @@ class CroppedPascalPartsDataset:
         use_truncated=False,
     ):
         self.root = data_dir
-        self.voc_loader = pascal_part.PascalPartLoader(self.root)
+        self.pascal_part_loader = pascal_part.PascalPartLoader(self.root)
+        self.voc_loader = voc_utils.VOCLoader(self.root)
         self.image_set = "person_" + split
         self.keep_difficult = use_difficult
         self.use_occluded = use_occluded
@@ -77,17 +78,37 @@ class CroppedPascalPartsDataset:
         self._imgsetpath = os.path.join(self.root, "ImageSets", "Main", "%s.txt")
 
         data_split = voc_utils.DATA_SPLIT[split]
-        ids_df = self.voc_loader.load_object_class_cropped(
+        ids_df_pascal_parts = self.pascal_part_loader.load_object_class_cropped(
             voc_utils.ANNOTATION_CLASS.person, data_split, dir_cropped_csv
         )
-        if not use_difficult:
-            ids_df = ids_df[ids_df.difficult != 1]
-        if not use_occluded:
-            ids_df = ids_df[ids_df.occluded != 1]
-        if not use_truncated:
-            ids_df = ids_df[ids_df.truncated != 1]
+        ids_df_voc = self.voc_loader.load_object_class_cropped(
+            voc_utils.ANNOTATION_CLASS.person,
+            data_split,
+            os.path.join(dir_cropped_csv, "voc"),
+        )
 
-        self.ids = ids_df.to_dict("records")
+        # Do NOT use images with difficult, truncated or occluded objects
+        # Also do not use fnames which have some error while iterating the dataset
+        # see `test_iterate_dataset_once` for details
+        remove_set = set()
+        if not use_difficult:
+            remove_set.update(ids_df_voc.fname[ids_df_voc.difficult == 1])
+        if not use_occluded:
+            remove_set.update(ids_df_voc.fname[ids_df_voc.occluded == 1])
+        if not use_truncated:
+            remove_set.update(ids_df_voc.fname[ids_df_voc.truncated == 1])
+
+        if os.path.exists(os.path.join(dir_cropped_csv, "faulty_fnames.csv")):
+            df_faulty = pd.read_csv(
+                os.path.join(dir_cropped_csv, "faulty_fnames.csv"), names=["fname"]
+            )
+            remove_set.update(df_faulty.fname)
+
+        ids_df_pascal_parts = ids_df_pascal_parts[
+            np.logical_not(ids_df_pascal_parts.fname.isin(remove_set))
+        ]
+
+        self.ids = ids_df_pascal_parts.to_dict("records")
 
         unique_new_labels = list(set(list(self.PART_REMAPPING.keys())))
         if "background" in unique_new_labels:
@@ -175,6 +196,8 @@ class CroppedPascalPartsDataset:
         )
 
         boxes = [p.bbox for p in new_object.parts]
+        if len(boxes) == 0:
+            boxes = [[]]
         gt_classes = [self.class_to_ind[p.part_name] for p in new_object.parts]
 
         object_bbox = new_object.bbox
