@@ -1,5 +1,6 @@
 import os
 import sys
+import numpy as np
 
 import torch
 import torch.utils.data
@@ -36,16 +37,9 @@ class CroppedPascalPartsDataset(datasets.CroppedPascalPartsDataset):
         self.transforms = transforms
 
     def __getitem__(self, index):
-        img, target, index = super(CroppedPascalPartsDataset, self).__getitem__(index)
-
-        target = target.clip_to_image(remove_empty=True)
-        if self.transforms is not None:
-            img, target = self.transforms(img, target)
-
-        return img, target, index
-
-    def get_groundtruth(self, index):
-        target_values = super(CroppedPascalPartsDataset, self).get_groundtruth(index)
+        img, target_values, index = super(CroppedPascalPartsDataset, self).__getitem__(
+            index
+        )
 
         boxes = target_values["boxes"]
         labels = target_values["labels"]
@@ -61,4 +55,9 @@ class CroppedPascalPartsDataset(datasets.CroppedPascalPartsDataset):
         # The reason for this is because I could not establish the mapping between
         # the pascal part annotation and the pascal voc annotation
         target.add_field("difficult", torch.zeros_like(labels, dtype=labels.dtype))
-        return target
+
+        target = target.clip_to_image(remove_empty=True)
+        if self.transforms is not None:
+            img, target = self.transforms(img, target)
+
+        return img, target, index

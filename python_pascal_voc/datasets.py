@@ -22,6 +22,7 @@ from python_pascal_voc import pascal_part
 
 
 class CroppedPascalPartsDataset:
+    # TODO: make remapping into a parameter to feed into the class from outside
     PART_REMAPPING = {
         "head": [
             pascal_part.PERSON_PARTS.head,
@@ -108,6 +109,18 @@ class CroppedPascalPartsDataset:
         img = Image.open(self._imgpath % fname).convert("RGB")
 
         target = self.get_groundtruth(index)
+        target_values = target
+
+        boxes = target_values["boxes"]
+        labels = target_values["labels"]
+        object_bbox = target_values["object_bbox"]
+        img = img.crop(box=object_bbox)
+
+        offset = np.concatenate([object_bbox[:2], object_bbox[:2]], axis=-1)
+        boxes = [b - offset for b in boxes]
+
+        target["boxes"] = boxes
+
         return img, target, index
 
     def __len__(self):
@@ -117,12 +130,14 @@ class CroppedPascalPartsDataset:
         example = self.ids[index]
         fname = example["fname"]
         object_id = example["object_id"]
-        anno = ET.parse(self._annopath % fname).getroot()
-        anno = self._preprocess_annotation(anno, object_id)
+        # anno = ET.parse(self._annopath % fname).getroot()
+        # anno = self._preprocess_annotation(anno, object_id)
         part_anno = self._preprocess_part_annotation(fname, object_id)
+        im_info = self.get_img_info(index)
 
-        target = {}
-        target.update(anno)
+        target = {
+            "im_info": [im_info["height"], im_info["width"]],
+        }
         target.update(part_anno)
         """
             boxes : List[Tuple[int]]
@@ -183,10 +198,23 @@ class CroppedPascalPartsDataset:
     def get_img_info(self, index):
         example = self.ids[index]
         img_id = example["fname"]
-        anno = ET.parse(self._annopath % img_id).getroot()
-        size = anno.find("size")
-        im_info = tuple(map(int, (size.find("height").text, size.find("width").text)))
-        return {"height": im_info[0], "width": im_info[1]}
+        xmin = example["xmin"]
+        xmax = example["xmax"]
+        ymin = example["ymin"]
+        ymax = example["ymax"]
+
+        height = ymax - ymin
+        width = xmax - xmin
+        # height, width
+        # Because this dataset returns the cropped objects,
+        # we take the bounding box as the image info
+        # anno = ET.parse(self._annopath % img_id).getroot()
+        # size = anno.find("size")
+        # im_info = tuple(map(int, (size.find("height").text, size.find("width").text)))
+        # return {"height": im_info[0], "width": im_info[1]}
+
+        im_info = {"height": height, "width": width}
+        return im_info
 
     def map_class_id_to_class_name(self, class_id):
         return self.categories[class_id]
