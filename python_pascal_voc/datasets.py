@@ -158,6 +158,8 @@ class CroppedPascalPartsDataset:
 
         target = {
             "im_info": [im_info["height"], im_info["width"]],
+            "file_name": self._imgpath % fname,
+            "image_id": index,
         }
         target.update(part_anno)
         """
@@ -196,6 +198,7 @@ class CroppedPascalPartsDataset:
         )
 
         boxes = [p.bbox for p in new_object.parts]
+        masks = [p.mask for p in new_object.parts]
         if len(boxes) == 0:
             boxes = [[]]
         gt_classes = [self.class_to_ind[p.part_name] for p in new_object.parts]
@@ -208,6 +211,7 @@ class CroppedPascalPartsDataset:
             "labels": gt_classes,
             "part_anno": new_anno,
             "object_bbox": bndbox,
+            "masks" : masks,
         }
         return res
 
